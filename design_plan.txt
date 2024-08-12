@@ -1,0 +1,70 @@
+Design it methodically
+
+1. Decide on what features we want
+    Start with a subset of C to start off manageable
+
+2. Design and Documentation
+    Design the architecture, and define major components
+    Document designs and decisions
+
+3. Start basic
+    Begin by implementing lexer to tokenize the input source code and a parser to generate an abstract syntax tree (AST) (see flex/Bison)
+    Implement a basic code generator that translates the AST into assembly code
+
+4. Iterative Development
+    Build the compiler in increments. Start with basic syntax and functionality, then add more features over time
+
+5. Testing
+    test the compiler with C programs to make sure it's working correctly
+
+6. Refactoring and Optimization
+    Refactor Early: refactor code as needed but avoid over engineering, get a working prototype
+    Optimizations: Add Optimizations after we have a basic compiler working
+
+7. Learning and Research
+    Compiler Theory: Get familar with compiler construction concepts, such as parsing techniques, syntax trees, and code generation
+    Assembly Language: Learn X86_64 
+
+features
+________________________________________________________________________________________________________________________________________
+Everything basic needed for a language to perform
+- loops: for, while, do while
+- conditionals: if, else if, else, switch 
+- keywords: like return, break, continue
+- functions: definition, function calls, return values, parameters
+- data types: composite and primitive, ADTs
+- scope and namespace
+- memory management
+- error handling: meaningful error messages and making sure operations are semantically correct (e.g type checking)
+
+Compiler Theory:
+3 main steps
+- Lexical Analysis
+- Syntax Analysis
+- Semantic Analysis
+
+Can then generate intermediate code which it then optimizes and outputs as assembly
+
+Lexical Analysis
+- compiler passes through the source code marking every token (piece of text) according to the meaning they hold for this statement
+- int x = a + b + c         datatype identifier = identifier + identifier + identifier
+- uses regular expressions to match each keyword or type to what they represent
+- Types of Tokens: Keywords, identifier, Operators, Punctations, 
+
+Syntax Analysis
+- languages also have their own grammer
+- Context Free Grammers (CFG) are usually a set of rules which describe the valid ordering or combination of the grammer components
+- For instance, a language CFG may have one rule which states that every data type must be immedidately followed by an identifier
+- Compiler generates a parse tree which contains the tokens 
+- If the compiler cannot find a valid rule in the CFG for a statement, it throws a syntax error and stops the compilation process
+
+Semantic Analysis
+- Once the parse tree is generated it is semantically verified. This means the compiler checks to see whether the generated parse tree 
+    holds meaningful statements 
+    For instance, what if int x = a + b + c was where a is boolean but b is integer
+    Since there is no valid rule for adding bools and ints, an error would be thrown
+    If valid, the compiler would go on and generate intermediate code, which it then optimizes, and generates assembly or machine code
+
+System design notes
+- Component design
+- scalability and extensibility

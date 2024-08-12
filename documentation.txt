@@ -1,0 +1,40 @@
+lexer
+
+The Lexer is responsible for turning each line into a vector of tokens
+
+Lexer is reponsible for text based errors like inproper symbols or characters
+
+lexer breaks text into tokens
+if it finds an invalid token, it generates an error 
+passes data to the syntax analyzer when it demands
+lexer should only produce a token when asked by the syntax analyzer
+if any error is present, then LA will correlate that error with source file and line number
+
+read next token depending on where col is located
+col should always be at the start of the token
+after successful token move col to the location 1 after the end
+if the line has ended read a new line
+
+syntax analyzer will be reponsible for errors related to logic such as undefined variable
+
+I'm having the lexer handle the logic for comments since they're not related to logic
+
+The lexer will be diveded up into 4 token types: number, string, symbol, identifier. I think this works because each token type each uses a distinct
+way of logically determining what token it is, e.g all identifier start with a letter, all symbols are 1-2 characters, strings start with ", etc
+
+I'll have the parser be responsible for further catagorizing these tokens into more specific rules and grammer
+
+Going to also add a EOF Token so that the parser will know when the statement has ended
+
+Numbers can be immedidately proceeded by a lot of operators e.g +, -, |, < etc, so the parser will handle the logic for symbols following the number
+while the lexer only makes sure the number doesn't have invalid characters.
+
+numbers will be kept as string until the parser since tokens hold string as a 2nd type
+-------------------------------------------------------------------------------------------------
+FEATURES:
+
+KEYWORDS: IF, ELSE IF, ELSE, WHILE, FOR, RETURN, BREAK, MAIN, 
+TYPES: INT, CHAR, FLOAT, DOUBLE, VOID
+COMMENTS
+
+IDENTIFIERS = KEYWORDS, DATA TYPES, FUNCTIONS  (this is because they all follow the same rule for parsing)
