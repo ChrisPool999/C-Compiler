@@ -4,64 +4,75 @@
 #include <string>
 #include <stdint.h>
 #include <iostream>
+#include <vector>
+
+constexpr uint32_t flag(int bit) {
+  return 1 << bit;
+}
 
 class SymbolTable {
 private:
   using Flags = uint32_t; 
 
-  struct SymbolTableInfo {
+  struct SymbolInfo {
+    Flags flags = 0b0;
     uint32_t block;
     uint32_t* address;
     uint32_t size;
     uint32_t lineDeclared;
     std::list<uint32_t> linesUsed;
     uint32_t dimension;
-    uint32_t* closingScope;
     char* initValue;
     std::vector<Flags> paramList;
-    Flags flags = 0b0000;
   };
 
-  // mapped with a stack, to support variable shadowing 
-  std::unordered_map<std::string, std::stack<SymbolTableInfo>> table; 
+  // first stack --> function stack      second stack --> variable shadowing 
+  std::stack<std::unordered_map<std::string, std::stack<SymbolInfo>>> table;
 public:
-  enum class TypeFlags {
-    
-  }
+  enum class Flags {
+    INT = flag(0),
+    CHAR = flag(1),
+    FLOAT = flag(2),
+    DOUBLE = flag(3),
+    VOID = flag(4),
 
-  enum class FlagOptions {
-    CONST = 1,
-    STATIC = 2,
-    EXTERN = 4,
-    INIT = 8,
-    POINTER = 16,
-    ARRAY = 32,
-    STRUCT = 64,
-    FUNCTION = 128,
-    VARIABLE = 256,
-    INT = 512,
-    CHAR = 1024,
-    FLOAT = 2048,
-    DOUBLE = 4096,
-    VOID = 8192,
-    BEING_DEFINED = 16384
+    VARIABLE = flag(5),
+    FUNCTION = flag(6),
+    STRUCT = flag(7),
+
+    ARRAY = flag(9),
+    POINTER = flag(10),
+    CONST = flag(8),
+    STATIC = flag(10),
+    EXTERN = flag(11),
+
+    DEFINED = flag(12)
   };
 
-  void addName(char* name, uint32_t block, uint32_t lineDeclared, uint32_t* address);
+  // struct - address, size, lineDeclared, linesUsed, paramList, 
+  // function - address, lineDeclared, linesUsed, paramList, TYPE, KIND, KINDAttribute, DEFINED
+  // variable - block, address, size, line declared, linesUsed, dimension, initValue, TYPE, KIND, KINDAttribute, defined
+  void addName(char* name, uint32_t block, uint32_t lineDeclared);
   void removeName(char* name);
   bool checkExists(char*);
-  void setBlock();
+  void functionCall();
+  void functionEnd();
+
   void setAddress();
   void setSize();
-  void setLineDeclared();
-  void setDataType();
-  void setTypeSize();
-  void setdimension();
-  void setlinesUsed();
-  Flags getFlags(char*);
+  void addLineUsed();
+  void setDimension();
+  void setInitValue();
+  void setParamList();
   void setFlags(uint32_t flags);
+
+  uint32_t getBlock();
+  uint32_t* getAddress();
+  uint32_t getSize();
+  uint32_t getLineDeclared();
+  std::list<uint32_t> getLinesUsed();
+  uint32_t getDimension();
+  char* getInitValue();
+  std::vector<Flags> getParamList();
+  Flags getFlags(char*);
 };
-
-// lexer (add name) = name, line declared
-
-// parser - block, 
