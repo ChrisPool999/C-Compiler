@@ -21,8 +21,6 @@ const std::unordered_map<Token_Type, std::regex> Scanner::token_to_regex = {
   {Token_Type::STRING, std::regex("^(\"[\s\S]\")$")}
 };
 
-  // {Token_Type::SYMBOL, std::regex("(^[\(\){}\[\]<>+\-*/!=%&|^~,;]|<=|>=|!=|==|\+\+|\+=|--|-=|\*=|/=|//|&&|<<|>>|\|\|$)")},
-
 // used for debugging
 const std::unordered_map<Token_Type, std::string> Scanner::token_as_str = {
   {Token_Type::KEYWORD, "KEYWORD"},
@@ -149,19 +147,3 @@ int main(int argc, char* argv[]) {
     sc.record_token(t.value);
   }
 }
-
-// add char
-
-// make sure goto_start and goto_end work for new stuff added
-// - string
-// - comment
-// - 2 width symbols
-
-// include line number not just col position for seeing where syntax error is
-// allow strings to run multiple lines
-
-// symbol table needs:
-//  - user defined symbols
-//  - kind: reserved, typeID, varID, funcID, etc
-//  - block number (scope)
-//  - type: int, double, bull
