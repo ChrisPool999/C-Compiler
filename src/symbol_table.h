@@ -6,60 +6,115 @@
 #include <iostream>
 #include <vector>
  
-constexpr uint32_t flag(int bit) {
+
+// SYMBOL
+
+// - used to describe things
+// - diffrent kinds of symbol
+// - many properties are shared, some are different 
+
+  // KINDS
+    // struct defintion
+    // - CONST STATIC EXTERN DEFINED
+    // - block
+    // - line declared
+    // - lines used
+    // - parameter list
+    // - Size (implement later, unsure how know)
+
+    // struct instance
+    // - CONST STATIC EXTERN DEFINED POINTER
+    // - block
+    // - line declared
+    // - lines used
+    // - parameter list
+  
+    // function
+    // - CONST STATIC EXTERN DEFINED POINTER
+    // - block
+    // - line declared
+    // - lines used
+    // - parameter list
+    // - TYPE + POINTER
+    // - POINTER
+
+    // variable
+    // - CONST STATIC EXTERN DEFINED
+    // - block
+    // - line declared
+    // - lines used
+    // - size
+    // - TYPE + POINTER
+
+
+
+
+
+
+
+
+
+// NOTE2SELF: static function just means it can only be used in this file, even if exported 
+static constexpr uint32_t flag(int bit) {
   return 1 << bit;
 }
 
-enum class Flags {
-  INT = flag(0),
-  CHAR = flag(1),
-  FLOAT = flag(2),
-  DOUBLE = flag(3),
-  VOID = flag(4),
-
-  VARIABLE = flag(5),
-  FUNCTION = flag(6),
-  STRUCT = flag(7),
-
-  ARRAY = flag(9),
-  POINTER = flag(10),
-  CONST = flag(8),
-  STATIC = flag(10),
-  EXTERN = flag(11),
-
-  DEFINED = flag(12)
+enum class Type {
+  INT,
+  CHAR,
+  FLOAT,
+  DOUBLE,
+  VOID
 };
 
-class Base {
-  uint32_t flags = 0b0;
-  uint32_t block;
-  uint32_t* address;
+// variable TYPE = pointer
+
+// function return TYPE = pointer
+// function = pointer 
+
+// struct defintion != pointer
+// struct instance =  pointer
+
+// handle pointer dimension...
+
+// function, struct definition, struct instance, variable
+enum class Flags {
+  POINTER = flag(0),
+  CONST = flag(1),
+  STATIC = flag(2),  
+  EXTERN = flag(3), 
+  DEFINED = flag(4) 
+};
+// FLAG SAFETY CHECKS:
+//  - <= 1 storage specifier
+//  - struct defintion shouldnt be pointer
+
+// - would be nice to have pointer held with the type, since thats where it logically belonds
+// - sooo many properties and just getters and setters...
+
+// function
+// - block 
+// - address
+// - lineDeclared
+// - linesUsed
+// 
+
+class Symbol {
+  uint32_t block; // functions not always global... think int (*foo)(int);
+  uint32_t* address; // struct defintion doesnt need one
   uint32_t lineDeclared;
   std::list<uint32_t> linesUsed;
+  uint32_t flags;
 
-  Flags getFlags(char*); 
   uint32_t getBlock();
   uint32_t* getAddress();
   uint32_t getLineDeclared();
   std::list<uint32_t> getLinesUsed();
+  Flags getFlags(char*); 
 
-  void setFlags(uint32_t flags);    
   void setAddress();
   void addLineUsed();
-};
-
-class Variable {
-  Base base;
-  uint32_t size;
-  uint32_t dimension;
-  char* initValue;
-
-  uint32_t getSize();
-  uint32_t getDimension();
-  char* getInitValue();
-  void setSize();
-  void setDimension();
-  void setInitValue();
+  void setFlags(uint32_t flags);    
 };
 
 class ParamList {
@@ -68,13 +123,34 @@ class ParamList {
   std::vector<Flags> getParamList();
 };
 
+class Variable {
+  Symbol base;
+  Type type;
+  uint32_t size;
+  uint32_t dimension;
+  char* initValue;
+
+  void getType();
+  uint32_t getSize();
+  uint32_t getDimension();
+  char* getInitValue();
+  void setType();
+  void setSize();
+  void setDimension();
+  void setInitValue();
+};
+
 class Function {
-  Base base;
+  Symbol base;
   ParamList parameters;
+  Type returnType;
+
+  Type getType();
+  void setType();
 };
 
 class Struct {
-  Base base;
+  Symbol base;
   ParamList parameters;
   uint32_t size;
 
