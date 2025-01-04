@@ -16,28 +16,120 @@ bool contains(const std::vector<char*> vec, const char* val) {
   return false;
 }  
 
+bool isWhiteSpace(const char ch) {
+  return (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\0');
+}
+
+bool isComment(const std::string& input, const uint32_t i) {
+  return i + 1 < input.size() && input[i] == '/' && input[i+1] == '/';
+}
+
+bool Lexer::isPunctuator(const char ch) const {
+  for (auto p : punctuators) {
+    if (p == ch) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool Lexer::isOperator(char ch, char ch2 = '\0') const {
+  if (ch2 == '\0') {
+    for (const auto &op : operators) {
+      if (op[0] == ch && op[1] == '\0') {
+        return true;
+      }
+    }
+  }
+  else {
+    for (const auto &op : operators) {
+      if (op[0] == ch && op[1] == ch2) {
+        return true;
+      }
+    }  
+  }
+  return false;    
+}
+
+int32_t Lexer::findTokenStart(uint32_t i) const {
+  while (i < srcLine.size() && isWhiteSpace(srcLine[i])) {
+    i++;
+  }
+  
+  if (i >= srcLine.size() || isComment(srcLine, i)) {
+    return -1;
+  }
+  
+  return i;
+}
+
+TokenType Lexer::findTokenType(const uint32_t start) {
+  char ch = srcLine[start];
+  if (isalnum(ch) || ch == '_') {
+    // identifier or token
+  }
+  if (std::isdigit(ch) || ch == '.') {
+    pendingToken.type = TokenType::CONSTANT;
+  }
+  if ()
+}
+
+uint32_t Lexer::findTokenEnd(uint32_t start) const {
+  char ch = srcLine[start];
+  if (isalpha(ch) || ch == '_') {
+    while (isalnum(ch) || ch == '_') {
+      start++;
+    }
+    return start;
+  }
+
+  if (ch == '"') {
+    start++;
+    while (ch != '"') {
+      start++;
+    }
+    return start;
+  }
+
+  if (ch == '.' || std::isdigit(ch)) {
+    bool hasDecimal = false;
+    while (std::isdigit(ch) || (ch == '.' && !hasDecimal)) {
+      if (ch == '.') {
+        hasDecimal = true;
+      }
+      start++;
+    }
+    return start;
+  }
+
+  if (isPunctuator(ch)) {
+    return ++start;
+  }
+
+  if (start + 1 < srcLine.size() && isOperator(ch, srcLine[start + 1])) {
+    return start + 2;
+  }
+
+  if (isOperator(ch)) {
+    return start + 1;
+  }
+
+  return -1; // error
+}
+
 TokenType Lexer::getTokenType
     (const u_int32_t start, const u_int32_t end) const {
-
 }
 
 int main() {
   std::cout << sizeof(TokenType) << std::endl;
 }
 
-// keep going until we find a valid character... (use this to ignore all white space)
-// - HAVE FOUND TOKEN START: 
-
-// - catagorize type of token based on initial character
-//   - function to handle each type of token based off intial character, eg letter and keyword or identifier
-//   - return token type
-
-
 
 // identifiers: handle WITH regex. ends when legit anything else other than alphanumber + '_'
-// keywords: after checking for identifier, see if it matches with a keyword
+// string: handle w/o regex
 // constants: handle WITH regex 
-// literals: handle w/o regex
+// keywords: after checking for identifier, see if it matches with a keyword
 // operators: handle w/o regex
 // punctuators: handle w/o regex 
 
@@ -45,19 +137,18 @@ int main() {
 
 // identifer must start with letter or underscore
 // number must start with number but only include numbers
+//--------------------------------------------------------------------------------------------------------
 
-// must splice the regex search in C regex...
+// ID:          punctuator, operator, whitespace, 
+// STRING:      Quote
+// CONSTANT:    punctuator, operator, whitespace (NOT decimal)
+// KEYWORD:     punctuator, operator, whitespace, 
+// OPERATOR:    base it off size
+// PUNCTUATOR:  base it off size
 
-// do a findStart() and findEnd()
+// ends if space, punctuator, operator 
 
-// findStart() -> pass through comments and white space, until we find a new character
-// findEnd() -> go until a space or operator/punctuator is found
-
-// findEnd solution:
-// - slower, more flexible, allows easier maintaince and expansion
-
-// break it down more based on first char:
-// - find int
-// - find identifier/keyword
-// - find literal
-// - dont need regex for operator, can have a isOperator() function
+// letter -> ID, Keyword
+// int    -> constant or decimal
+// Quotes -> String
+// nothing else? == operator or symbol 
