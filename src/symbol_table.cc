@@ -1,20 +1,10 @@
 #include "symbol_table.h"
 
 void SymbolTable::addName(
-    char* name, uint32_t block, uint32_t lineDeclared) {
-  SymbolInfo info;
+    char* name, uint32_t block, uint32_t lineDeclared) {}
 
-  info.block = block;
-  info.lineDeclared = lineDeclared;
+void SymbolTable::removeName(char* name) {}
 
-  table.top()[name].push(info);
-}
+int main() {
 
-void SymbolTable::removeName(char* name) {
-  if (table.find(name) != table.end()) {
-    table[name].pop();
-  }
-  else {
-    throw std::runtime_error("name doesnt exist");
-  }
 }
