@@ -2,6 +2,7 @@
 #include <vector>
 #include <cstring>
 #include <queue>
+#include <regex>
 
 enum class TokenType {
   IDENTIFER,
@@ -12,18 +13,24 @@ enum class TokenType {
   PUNCTUATORS
 };
 
+// switches between Lexer and Parser
+
+// lexer generates tokens
+// parser needs Tokens
+
+
+// ASTNode* node = nullptr; // add in later 
 class Token {
   friend class Lexer;
+  std::string value = "";
   TokenType type;
-  char* value = nullptr;
-  uint32_t line;
-  uint32_t col;
-  // ASTNode* node = nullptr; // add in later 
+  uint32_t line = -1;
+  uint32_t col = -1;
 public:
   TokenType getType() const {
     return type;
   }
-  const char* getValue() const {
+  const std::string getValue() const {
     return value;
   }
   uint32_t getLine() const {
@@ -36,21 +43,24 @@ public:
 
 class Lexer {
   static constexpr uint32_t maxBufferSize = 128;
+  static constexpr uint32_t minBufferSize = maxBufferSize / 4;
   std::queue<Token> buffer;
-  Token pendingToken;
+  Token pendingToken = Token();
 
   std::ifstream file;
   std::string srcLine;
-  uint32_t line = 1;
-  uint32_t col = 1;
+  uint32_t line = 0;
+  uint32_t col = 0;
 
-  const std::vector<char*> keywords = {
+  std::regex regexID = std::regex("^[_A-Za-z][_A-Za-z\\d]*");
+  std::regex regexConstant = std::regex("^[+-]?\\d*.?\\d*");
+  const std::vector<std::string> keywords = {
       "if", "else", "while", "for", "continue", 
       "return", "break", "main", "struct", "int",
       "short", "long", "float", "double", "char"
       "void", "struct", "static", "const", "extern"
   };  
-  const std::vector<char*> operators = {
+  const std::vector<std::string> operators = {
       ".", "!", "!=", "=", "==", "<", "<=", 
       ">", ">=","+", "+=", "-", "-=", "*", 
       "*=", "/", "/=", "%", "%=", "&&", "||"
@@ -59,14 +69,19 @@ class Lexer {
       ',', '[', ']', '(', ')', '{', '}', '\'', '\"', ';'
   };
 
-  bool isPunctuator(char ch) const;
-  bool isOperator(char ch, char ch2 = '\0') const;
-  int32_t findTokenStart(uint32_t i) const;
-  uint32_t findTokenEnd(const uint32_t start) const;
-  TokenType findTokenType(const uint32_t start);
-  void fillBuffer();
-
+  bool isPunctuator(const char ch) const;
+  bool isOperator(const char ch, const char ch2) const;
+  bool isOperator(const char ch) const;
+  bool isKeyword(std::string& str);
+  void skipWhiteSpace();
+  void setToken(TokenType type, std::string val);
+  void parseString();
+  void parseWithRegex(TokenType type, std::regex& regex);
+  void processToken();
+  bool getNextLine();
+  bool fillBuffer();
 public:
+  Lexer(std::string filename);
   Token requestToken();
-  Token peekNextToken();
+  const Token peekNextToken();
 };

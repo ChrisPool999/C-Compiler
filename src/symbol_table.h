@@ -41,7 +41,6 @@ struct TypeDescriptor {
 };
 
 class MetaData {
-private:
   Flags flags;
   uint32_t block;
   std::pair<uint32_t, uint32_t> declLocation;
@@ -57,7 +56,6 @@ public:
 // Symbol Types
 
 class Variable {
-private:
   MetaData metaData;
   TypeDescriptor typeDescriptor;
   char* initValue = nullptr;
@@ -70,7 +68,6 @@ public:
 };
 
 class FunctionDef {
-private:
   MetaData metaData;
   ReturnType returnType;
   std::vector<Variable> parameters;
@@ -83,7 +80,6 @@ public:
 };
 
 class FunctionPtr {
-private:
   uint32_t pointerDepth = 0;
   FunctionDef function;
 public:
@@ -93,7 +89,6 @@ public:
 };
 
 class StructDef {
-private:
   MetaData metaData; 
   std::vector<Variable> parameters;
 public:
@@ -103,7 +98,6 @@ public:
 };
 
 class StructInstance {
-private:
   MetaData metadata;
   StructDef* defintion;
   uint32_t pointerDepth = 0;
@@ -118,7 +112,6 @@ using Symbol = std::variant<
     Variable, FunctionDef, FunctionPtr, StructDef, StructInstance>;
 
 class SymbolTable {
-private:
   static std::unordered_map<std::string, Symbol> globals;
   SymbolTable* prevScope = nullptr;
 
