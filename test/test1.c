@@ -27,6 +27,7 @@ const int main()
   bar + 3;
 
   3;
+  'foobar';
   "foobar"; int* woo = &foo; 
   &foo;
   *woo;

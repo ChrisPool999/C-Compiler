@@ -23,9 +23,10 @@ public:
   }
 };
 
+// line and col properties are 0-indexed
 void Lexer::throwError(std::string msg) {
-  std::string location = "line " + std::to_string(line) 
-      + "col " + std::to_string(col) + ": ";
+  std::string location = "line " + std::to_string(line + 1) 
+      + "col " + std::to_string(col + 1) + ": ";
   throw SyntaxException(location + msg);
 }
 
@@ -80,22 +81,20 @@ void Lexer::setToken(TokenType type, std::string value) {
   pendingToken.value = value;
 }
 
+// only matches with same quote type, eg single quote or double quote
 void Lexer::parseString() {
+  char quoteType = srcLine[col];
   uint32_t i = col + 1;
   std::string tokenValue = "";
 
-  while (i < srcLine.size() && srcLine[i] != '"') {
+  while (i < srcLine.size() && srcLine[i] != quoteType) {
     tokenValue += srcLine[i];
     i++;
   }
-
-  col = i + 1;
-
-  if (col >= srcLine.size()) {
-    std::cout << tokenValue << std::endl;
+  if (i >= srcLine.size()) {
     throwError("Missing enclosing quotation");
   }
-
+  col = i + 1;
   setToken(TokenType::STRING, tokenValue);
 }
   
@@ -114,7 +113,7 @@ void Lexer::parseWithRegex(TokenType type, std::regex& regex) {
 // checked first or the quote will be marked as a punctuator
 void Lexer::processToken() {
   char ch = srcLine[col];
-  if (ch == '"') {
+  if (ch == '\'' || ch == '\"') {
     parseString();
   }
   else if (ch == '.' || std::isdigit(ch)) {
@@ -203,8 +202,6 @@ int main() {
   }
   return 0;
 }
-
-// handle chars...
 
 // TESTING
 // BENCHMARKING
