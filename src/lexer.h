@@ -10,14 +10,9 @@ enum class TokenType {
   CONSTANT, 
   KEYWORD,
   OPERATOR,
-  PUNCTUATORS
+  PUNCTUATORS,
+  END_OF_FILE
 };
-
-// switches between Lexer and Parser
-
-// lexer generates tokens
-// parser needs Tokens
-
 
 // ASTNode* node = nullptr; // add in later 
 class Token {
@@ -27,6 +22,10 @@ class Token {
   uint32_t line = -1;
   uint32_t col = -1;
 public:
+  Token() {};
+  Token(TokenType type) {
+    this->type = type;
+  }
   TokenType getType() const {
     return type;
   }
@@ -52,23 +51,24 @@ class Lexer {
   uint32_t line = 0;
   uint32_t col = 0;
 
-  std::regex regexID = std::regex("^[_A-Za-z][_A-Za-z\\d]*");
-  std::regex regexConstant = std::regex("^[+-]?\\d*.?\\d*");
+  std::regex regexID = std::regex("^[_A-Za-z]+[_A-Za-z0-9]*\\b");
+  std::regex regexConstant = std::regex("^[+-]?\\d*.?\\d*\\b");
   const std::vector<std::string> keywords = {
       "if", "else", "while", "for", "continue", 
       "return", "break", "main", "struct", "int",
-      "short", "long", "float", "double", "char"
+      "short", "long", "float", "double", "char",
       "void", "struct", "static", "const", "extern"
   };  
   const std::vector<std::string> operators = {
       ".", "!", "!=", "=", "==", "<", "<=", 
-      ">", ">=","+", "+=", "-", "-=", "*", 
+      ">", ">=", "+", "+=", "-", "-=", "*", 
       "*=", "/", "/=", "%", "%=", "&&", "||"
   };
   const std::vector<char> punctuators = {
       ',', '[', ']', '(', ')', '{', '}', '\'', '\"', ';'
   };
 
+  void throwError(std::string msg);
   bool isPunctuator(const char ch) const;
   bool isOperator(const char ch, const char ch2) const;
   bool isOperator(const char ch) const;
@@ -78,8 +78,8 @@ class Lexer {
   void parseString();
   void parseWithRegex(TokenType type, std::regex& regex);
   void processToken();
-  bool getNextLine();
-  bool fillBuffer();
+  void getNextLine();
+  void fillBuffer();
 public:
   Lexer(std::string filename);
   Token requestToken();

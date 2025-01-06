@@ -2,6 +2,17 @@
 #include <exception>
 #include "lexer.h"
 
+std::string _DEBUG_getTokenTypeStr(TokenType type) {
+  if (type == TokenType::CONSTANT) return "CONSTANT";
+  if (type == TokenType::END_OF_FILE) return "END_OF_FILE";
+  if (type == TokenType::IDENTIFER) return "IDENTIFER";
+  if (type == TokenType::KEYWORD) return "KEYWORD";
+  if (type == TokenType::OPERATOR) return "OPERATOR";
+  if (type == TokenType::PUNCTUATORS) return "PUNCTUATORS";
+  if (type == TokenType::STRING) return "STRING";
+  throw std::runtime_error("unexpected tokentype passed");
+}
+
 class SyntaxException : public std::exception {
   std::string message;
 public:
@@ -11,6 +22,12 @@ public:
     return message.c_str();
   }
 };
+
+void Lexer::throwError(std::string msg) {
+  std::string location = "line " + std::to_string(line) 
+      + "col " + std::to_string(col) + ": ";
+  throw SyntaxException(location + msg);
+}
 
 static bool isWhiteSpace(const char ch) {
   return (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\0');
@@ -72,9 +89,11 @@ void Lexer::parseString() {
     i++;
   }
 
-  if (i >= srcLine.size()) {
-    char error[] = "line %d col %d: Missing enclosing quotation", line, col; 
-    throw SyntaxException(std::string(error));
+  col = i + 1;
+
+  if (col >= srcLine.size()) {
+    std::cout << tokenValue << std::endl;
+    throwError("Missing enclosing quotation");
   }
 
   setToken(TokenType::STRING, tokenValue);
@@ -87,14 +106,21 @@ void Lexer::parseWithRegex(TokenType type, std::regex& regex) {
   if (std::regex_search(subStr, match, regex)) {
     setToken(type, match.str());
   } else {
-    char error[] = "line %d col %d: Invalid syntax", line, col; 
-    throw SyntaxException(std::string(error));
+    throwError("Invalid syntax");
   }
 }
 
+// order is important, FOR EXAMPLE: parseString must be 
+// checked first or the quote will be marked as a punctuator
 void Lexer::processToken() {
   char ch = srcLine[col];
-  if (isPunctuator(ch)) {
+  if (ch == '"') {
+    parseString();
+  }
+  else if (ch == '.' || std::isdigit(ch)) {
+    parseWithRegex(TokenType::CONSTANT, regexConstant);
+  }
+  else if (isPunctuator(ch)) {
     setToken(TokenType::PUNCTUATORS, std::string(1, ch));
   }
   else if (col + 1 < srcLine.size() && isOperator(ch, srcLine[col + 1])) {
@@ -103,46 +129,34 @@ void Lexer::processToken() {
   else if (isOperator(ch)) {
     setToken(TokenType::OPERATOR, std::string(1, ch));
   }
-  else if (ch == '"') {
-    parseString();
-  }
-  else if (ch == '.' || std::isdigit(ch)) {
-    parseWithRegex(TokenType::CONSTANT, regexConstant);
-  }
   else if (isalnum(ch) || ch == '_') {
-    parseWithRegex(TokenType::IDENTIFER, regexConstant);
+    parseWithRegex(TokenType::IDENTIFER, regexID);
     if (isKeyword(pendingToken.value)) {
       pendingToken.type = TokenType::KEYWORD;
     }
   }
   else {
-    char error[] = "line %d col %d: Invalid character -> %c", line, col, ch; 
-    throw SyntaxException(std::string(error));
+    throwError("Invalid character ->" + ch);
   }
 }
 
-// returns true if EOF reached
-bool Lexer::getNextLine() {
-  if (file.eof()) {
-    return false;
-  }
+void Lexer::getNextLine() {
   std::getline(file, srcLine);
   line++;
   col = 0;
-  return true;
 }
 
-// returns true if EOF reached
-bool Lexer::fillBuffer() {
+void Lexer::fillBuffer() {
   while (buffer.size() != maxBufferSize) {
     skipWhiteSpace();  
 
-    if (col >= srcLine.size()) {
-      if (!getNextLine()) {
-        return false;
+    if (col >= srcLine.size() || isComment(srcLine, col)) {
+      if (file.eof()) {
+        return;
       }
+      getNextLine();
+      continue;
     }
-
     pendingToken.line = line;
     pendingToken.col = col;
 
@@ -166,7 +180,10 @@ Token Lexer::requestToken() {
   if (buffer.size() < minBufferSize) {
     fillBuffer();
   } 
-  Token token = buffer.back();
+  if (buffer.empty()) {
+    return Token(TokenType::END_OF_FILE);
+  }
+  Token token = buffer.front();
   buffer.pop();
   return token;
 }
@@ -178,7 +195,21 @@ const Token Lexer::peekNextToken() {
   return buffer.back();
 }
 
-// handle both functions both returning bool for EOF yet not doing anything
-// -- about it in the calling function
-// TEST
+int main() {
+  Lexer lex = Lexer("./test/test1.c");
+  Token t;
+  while ((t = lex.requestToken()).getType() != TokenType::END_OF_FILE) {
+    std::cout << t.getLine() << "-" << t.getCol() << " " << t.getValue() << " " << _DEBUG_getTokenTypeStr(t.getType()) <<std::endl;
+  }
+  return 0;
+}
+
+// handle chars...
+
+// TESTING
+// BENCHMARKING
+// DOCKER
+// AUTOMATION (CMake, Tests, Benchmarking)
+// ASYNCHRONIOUS (Threading will improve performance since Parser won't be waiting on I/O Reads)
+
 // any final refactoring
