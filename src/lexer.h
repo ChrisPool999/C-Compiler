@@ -50,37 +50,39 @@ class Lexer {
   std::string srcLine;
   uint32_t line = 0;
   uint32_t col = 0;
+  const std::regex regexID = std::regex("^[_A-Za-z]+[_A-Za-z0-9]*\\b");
+  const std::regex regexConstant = std::regex("^(?=.*\\d)[+-]?\\d*.?\\d*\\b");
 
-  std::regex regexID = std::regex("^[_A-Za-z]+[_A-Za-z0-9]*\\b");
-  std::regex regexConstant = std::regex("^[+-]?\\d*.?\\d*\\b");
+  void throwError(const std::string msg);
+  bool isPunctuator(const char ch) const;
+  bool isOperator(const char ch, const char ch2) const;
+  bool isOperator(const char ch) const;
+  bool isKeyword(const std::string& str) const;
+  bool isConstant(std::string& str, uint32_t i) const;
+  void skipWhiteSpace();
+  void setToken(const TokenType type, const std::string val);
+  void setString();
+  void setWithRegex(const TokenType type, const std::regex& regex);
+  void processToken();
+  void getNextLine();
+  void batchTokens();
+public:
   const std::vector<std::string> keywords = {
       "if", "else", "while", "for", "continue", 
       "return", "break", "main", "struct", "int",
       "short", "long", "float", "double", "char",
       "void", "struct", "static", "const", "extern"
   };  
-  const std::vector<std::string> operators = {
-      ".", "!", "!=", "=", "==", "<", "<=", 
-      ">", ">=", "+", "+=", "-", "-=", "*", 
-      "*=", "/", "/=", "%", "%=", "&&", "||"
+  const std::vector<char> operators = {
+      '.', '!', '=', '<', '>', '+', '-', '*', '/', '%'
+  };
+  const std::vector<std::string> dblOperators = {
+      "!=", "==", "<=", ">=", "+=", "-=", "*=", "/=", "%=", "&&", "||"
   };
   const std::vector<char> punctuators = {
       ',', '[', ']', '(', ')', '{', '}', '\'', '\"', ';'
   };
 
-  void throwError(std::string msg);
-  bool isPunctuator(const char ch) const;
-  bool isOperator(const char ch, const char ch2) const;
-  bool isOperator(const char ch) const;
-  bool isKeyword(std::string& str);
-  void skipWhiteSpace();
-  void setToken(TokenType type, std::string val);
-  void parseString();
-  void parseWithRegex(TokenType type, std::regex& regex);
-  void processToken();
-  void getNextLine();
-  void fillBuffer();
-public:
   Lexer(std::string filename);
   Token requestToken();
   const Token peekNextToken();
