@@ -71,7 +71,7 @@ public:
       "if", "else", "while", "for", "continue", 
       "return", "break", "main", "struct", "int",
       "short", "long", "float", "double", "char",
-      "void", "struct", "static", "const", "extern"
+      "void", "static", "const", "extern"
   };  
   const std::vector<char> operators = {
       '.', '!', '=', '<', '>', '+', '-', '*', '/', '%'
