@@ -36,7 +36,7 @@ class Grammer:
 
             lines:list[str] = file.readlines()
             for i in range(len(lines)):        
-                symbols:list[str] = lines[i].split()
+                symbols: list[str] = lines[i].split()
 
                 if not symbols:
                     self._rules[LHS] = expansions
@@ -53,6 +53,9 @@ class Grammer:
                 else:
                     print(symbols + "\n")
                     raise InputError("Invalid input", symbols)
+                
+                if i == len(lines) - 1:
+                    self._rules[LHS] = expansions
 
     def _remove_tags(self, symbol: str) -> str:
         """ Removes punctuation, tags, and extra information from the base symbol \n
@@ -80,6 +83,16 @@ class Grammer:
             ("ε" in self._rules.get(symbol, []))
         )
 
+    def _is_repetitive(self, symbol: str) -> bool:
+        return (
+            "<" in symbol and 
+            ">" in symbol and
+            (
+                symbol[-1] == "+" or
+                symbol[-1] == "*"
+            )
+        )
+
     def _get_rule(self, index: int) -> Rule:
         if (index >= len(self._rules.items())):
             raise IndexError(f"Index {index} is out of bounds")
@@ -88,38 +101,47 @@ class Grammer:
         return Rule(LHS=l, expansions=r)
 
 class TableGenerator:
-    _Item = namedtuple("item", ["rule", "lookahead"])
+    Item = namedtuple("item", ["RHS", "i", "lookahead"])
 
     def __init__(self, BNF_file, output_file = None):
         self._grammer = Grammer(BNF_file)
         self._states: list[list[self.Item]] = [] 
         self._stack = ["$"]
         
-        start_rule = self._grammer._get_rule(0)
-        start_item = self._Item(rule=start_rule, lookahead=["$"])
-        self._create_state(start_item)
+        # start_rule = self._grammer._get_rule(0)
+        # start_item = self.Item(rule=start_rule, lookahead=["$"])
+        # self._create_state(start_item)
 
-    def _create_state(self, start_item: _Item) -> None:
+    def _create_state(self, start_item: Item) -> None:
         return 
         # items = [start_item]
         # self._closure()
 
-    def _closure(self, item: _Item, state_num: int) -> _Item:
+    def _closure(self, item: Item, state_num: int) -> Item:
         # if closure is optional, find closure of next...
         return
 
-    def _find_follow(self, item: _Item, rule_index: int) -> list[str]:
-        # if next is optional, do find_follow on optional and item after
-        # if next is end of list, use look-ahead 
-        # if current is repetitive, use repetitive, and next  
-        # account for ε...
-        
-        if rule_index == len(item.rule) - 1:
-           return [item.lookahead]
+    def _find_follow(self, item: Item) -> set[str]:
+        terminals = set()
 
-        return
+        if self._grammer._is_repetitive(item.RHS[item.i]):
+            terminals |= self._find_first(item.RHS[item.i])
 
-    # handle if the first() symbol is optional in the closure() method
+        if item.i + 1 >= len(item.RHS):
+            terminals |= item.lookahead
+            return terminals
+
+        terminals |= self._find_first(item.RHS[item.i + 1])
+
+        if self._grammer._is_optional(item.RHS[item.i]):
+            self._find_follow(item, item.i + 1)
+
+        return terminals
+
+    # removing symbol at the top is important here 
+    # we want the symbol to be tagless for the entire method
+    # OTHER than when we call is_optional(), 
+    # which works since the symbols (s) still has tags during the nested for loop
     def _find_first(self, symbol: str, seen: set = None) -> set[str]:
         """
             Finds the terminal symbols that can expand from a symbol\n
@@ -151,7 +173,7 @@ class TableGenerator:
 
 def main():
     table = TableGenerator("PARSING/BNF.txt")
-    print(table._find_first("<declarator>"))
+    print(table._find_follow(table.Item(RHS=["{<external-declaration>}*"], i=0, lookahead=set("$"))))
 
 if __name__ == "__main__":
     main()
