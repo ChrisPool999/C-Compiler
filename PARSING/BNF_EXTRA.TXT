@@ -1,9 +1,9 @@
+  S' ::= <translation-unit> $
+
   1.) <translation-unit> ::= {<external-declaration>}*
 
-  2.) <external-declaration> ::= <function-definition>          
+  2.) <external-declaration> ::= <function-definition>     
                           | <declaration>                  
-
-  3.) <function-definition> ::= {<declaration-specifier>}* <declarator> {<declaration>}* <compound-statement>
 
   4.) <declaration-specifier> ::= <storage-class-specifier>
                             | <type-specifier>
@@ -19,6 +19,7 @@
                     | long
                     | float
                     | double
+                    | <struct>
 
   7.) <struct> ::= struct <identifier> { {<struct-declaration>}+ }
             | struct { {<struct-declaration>}+ }

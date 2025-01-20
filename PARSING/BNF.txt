@@ -1,3 +1,5 @@
+S' ::= <translation-unit> $
+
 <translation-unit> ::= {<external-declaration>}*
 
 <external-declaration> ::= <function-definition>          
@@ -19,6 +21,7 @@
                    | long
                    | float
                    | double
+                   | <struct>
 
 <struct> ::= struct <identifier> { {<struct-declaration>}+ }
            | struct { {<struct-declaration>}+ }
