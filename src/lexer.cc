@@ -71,18 +71,15 @@ bool Lexer::isKeyword(const std::string& str) const {
 }
 
 bool Lexer::isConstant(std::string& str, uint32_t i) const {
-  char ch = str[i];
-  return isdigit(ch) ||
+  return isdigit(str[i]) ||
       ( 
-        (ch == '+' || ch == '-' || ch == '.') && 
-        col + 1 <= srcLine.size() &&
-        isdigit(srcLine[col + 1])
+        (str[i] == '+' || str[i] == '-' || str[i] == '.') && 
+        (col + 1 <= srcLine.size() && isdigit(srcLine[col + 1]))
       ) || 
       (
-        (ch == '+' || ch == '-') &&
-        col + 2 <= srcLine.size() &&
-        srcLine[col + 1] == '.' &&
-        isdigit(srcLine[col + 2])
+        (str[i] == '+' || str[i] == '-') &&
+        col + 2 <= srcLine.size() && 
+        srcLine[col + 1] == '.' && isdigit(srcLine[col + 2])
       );
 }
 

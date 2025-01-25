@@ -1,5 +1,4 @@
-import sys
-from itertools import islice
+from __future__ import annotations
 from collections import namedtuple
 
 class InputError(Exception):
@@ -13,209 +12,299 @@ class InputError(Exception):
         
         return self.args[0]
 
-Rule = namedtuple("Rule", ["LHS", "expansions"])
+class Singleton(type):
+    _instance = None
+    
+    def __call__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instance
 
-class Grammer:
+Rule = namedtuple("Rule", ["lhs", "expansions"])
+
+class Grammar(metaclass=Singleton):
+    _rules: dict[str, list[str]] = {}
 
     def __init__(self, filename: str) -> None:
-        self._rules: dict[list:str] = {}
-        self._parse_grammer(filename)
+        self._parse_grammar(filename)
 
-    def _print_rules(self) -> None:
-        print("\n")
-        for LHS, expansions in self._rules.items():
-            print(LHS)
-            for e in expansions:
-                print("    " + str(e))
-            print("\n")
+    @classmethod
+    def _parse_grammar(cls, filename: str) -> None:
+        """
+            parse_grammar() will parse a textfile into a set of grammar rules\n
+            The format must be 'lhs ::= lhs' with any additional expansions
+            following each on a seperate line with the structure '| rhs'\n
+            Tags such as '+', '?' or '*' must be be immediately following the symbol
 
-    def _parse_grammer(self, filename: str) -> None:
+            Parameters: filename (str)
+
+            Returns: None 
+        """
         with open(filename, 'r') as file:
-            LHS = ""
-            expansions = []
+            lhs = None
 
-            lines:list[str] = file.readlines()
-            for i in range(len(lines)):        
-                symbols: list[str] = lines[i].split()
+            for line in file:        
+                substrs: list[str] = line.split()
 
-                if not symbols:
-                    self._rules[LHS] = expansions
-                    expansions = []
-                    continue
+                # A valid grammar rule will always have 3 parts:  LSH ::= RHS
+                if len(substrs) >= 3 and substrs[1] == "::=":
+                    lhs = substrs[0]
+                    expansion = substrs[2:]
+                    cls._rules[lhs] = [expansion]
+
+                # An empty RHS can be valid if it's not the only expansion
+                elif len(substrs) >= 1 and substrs[0] == '|':
+                    if not lhs:
+                        raise InputError("No lhs has been defined prior to this expansion", substrs)
+                    expansion = substrs[1:]
+                    cls._rules[lhs].append(expansion)
                 
-                if symbols[1] == "::=":
-                    LHS = symbols[0]
-                    expansions.append(symbols[2 : len(symbols)])
+                elif substrs:
+                    raise InputError("Invalid input", substrs)
 
-                elif (symbols[0] == '|'):
-                    expansions.append(symbols[1 : len(symbols)])
-                
-                else:
-                    print(symbols + "\n")
-                    raise InputError("Invalid input", symbols)
-                
-                if i == len(lines) - 1:
-                    self._rules[LHS] = expansions
-
-    def _remove_tags(self, symbol: str) -> str:
+    @classmethod
+    def _remove_tags(symbol: str) -> str:
         """ Removes punctuation, tags, and extra information from the base symbol \n
-            E.g {<assignment-operator}* --> <assignment-operator"""
+            E.g {<assignment-operator}* --> <assignment-operator>
 
+            Parameter: symbol(str)
+            Returns: str 
+        """
         left: int = None
         right: int = None
 
         for i in range(len(symbol)):
-            if symbol[i] == '<':
-                left = i
-            if (symbol[i] == '>'):
-                right = i
+            if symbol[i] == '<': left = i
+            if (symbol[i] == '>'): right = i
         
-        if left and right:
+        if left and right:  
             return symbol[left : right + 1]
         return symbol
 
-    def _is_terminal(self, symbol: str) -> bool:
-        return symbol not in self._rules 
+    @classmethod
+    def _find_first(cls, symbol: str, seen: set = None) -> set[str]:
+        """
+            Finds any terminal symbols that can result from a symbol be expanded\n
 
-    def _is_optional(self, symbol: str) -> bool:
+            Parameters:\n
+            symbol (str): The symbol you want to find the terminals of
+            seen (set): Default Parameter. Avoid passing this argument outside the method. Used to avoid infinite expansions\n
+
+            returns: \n 
+            list[str]: strings representing terminal symbols
+        """
+        symbol = cls._remove_tags(symbol)        
+        if seen is None: seen = set()
+
+        if symbol in seen: return set()
+        if cls._is_terminal(symbol): return set([symbol])
+
+        seen.add(symbol)
+
+        terminals = set()
+        for RHS in cls._rules[symbol]:
+            for s in RHS:
+                terminals |= cls._find_first(s, seen)
+                if not cls._is_optional(s): break
+
+        return terminals
+
+    @classmethod
+    def _is_terminal(cls, symbol: str) -> bool:
+        """
+            Returns true if a symbol can no longer expand\n
+
+            Parameters: symbol (str)
+
+            Returns: bool
+        """
+        return symbol not in cls._rules 
+
+    @classmethod
+    def _is_optional(cls, symbol: str) -> bool:
+        """
+            Returns true if a symbol is optional, meaning it can be omitted\n
+            e.g contains the tag '?' or '*'\n
+
+            Parameter: symbol (str)
+
+            Returns: bool
+        """
         return (
             symbol[-1] in {"?", "*"} or 
-            ("ε" in self._rules.get(symbol, []))
+            ("ε" in cls._rules.get(symbol, []))
         )
 
-    def _is_repetitive(self, symbol: str) -> bool:
+    @classmethod
+    def _is_repetitive(symbol: str) -> bool:
+        """
+            Returns true if a symbol can occur an arbitrary number of times\n
+            e.g contains the tag '+' or '*'\n
+
+            Parameters: symbol(str)
+
+            returns: bool
+        """
         return (
-            "<" in symbol and 
-            ">" in symbol and
+            "<" in symbol and ">" in symbol and
             (
                 symbol[-1] == "+" or
                 symbol[-1] == "*"
             )
         )
 
-    def _get_rule(self, index: int) -> Rule:
-        if (index >= len(self._rules.items())):
-            raise IndexError(f"Index {index} is out of bounds")
-        
-        l, r = list(self._rules.items())[index]
-        return Rule(LHS=l, expansions=r)
+    @classmethod
+    def _print_rules(cls) -> None:
+        """
+            Prints out the grammar rules
 
-class TableGenerator:
-    Item = namedtuple("item", ["RHS", "i", "lookahead"])
+            Parameters: None
 
-    def __init__(self, BNF_file, output_file = None):
-        self._grammer = Grammer(BNF_file)
-        self._states: list[list[self.Item]] = [] 
-        self._stack = ["$"]
-        
-        # start_rule = self._grammer._get_rule(0)
-        # start_item = self.Item(rule=start_rule, lookahead=["$"])
-        # self._create_state(start_item)
+            Returns: None
+        """
+        for lhs, expansions in cls._rules.items():
+            print("\n" + lhs)
+            for e in expansions:
+                print("    " + str(e))
 
-    def _create_state(self, start_item: Item) -> None:
-        return 
-        # items = [start_item]
-        # self._closure()
+class Item:
 
-    def _closure(self, item: Item, state_num: int) -> Item:
+    # dot position refers to the progress made in completing a grammer rule
+    def __init__(self, lhs: str, rhs: str, dot_pos: int, lookahead: str):
+        self.lhs = lhs
+        self.rhs = rhs
+        self.pos = dot_pos
+        self.lookahead = lookahead 
+
+    # LALR(1) parsing can merge states with differing look-aheads
+    def _cmp(self, item):
+        return (
+            self.lhs == item.lhs and
+            self.rhs == item.rhs and
+            self.dot_pos == item.dot_pos
+        )
+
+    def _closure(self) -> list[Item]:
+        """
+            Performs closure on a given item set. Returns all rules where the current symbol is on the LHS
+            and applies closure to any rules returned
+
+            Parameters: no parameters
+
+            Return: list[Item] Returns a list of item sets that are produced from closure
+        """
+    
+        if Grammar._is_repetitive(self.RHS[self.pos]):
+            pass
+        pass
+
+        # if optional?
+
+
         # if closure is optional, find closure of next...
-        return
+        # STEPS
+        # have: 
+            # 1. base rule and look-ahead (Item)
+            # 2. where we are at in the rule
+        # bring all rules where the closure symbol appears on the LHS...
+        # --passing along the lookahead, which is the follow() of the closure symbol
+        # perform closure on all new rules until we run out of rules
+
+
+        # _______________________________________________________________________________________________
+        # optional...
+
+        # decide between reducing/shifting? reduce x from nothing, or from a
+        # A -> y . X? z
+        # X -> . , z          
+        # X -> . a, z          
+
+        # repetitive...
+        # A -> y . X* z, (some look-ahead)
+        # X -> . X X , first(X)
+        # X -> . , z  
+        # X ..
+
+        # one or more...
+        # A -> y . X+ z
+        # X -> . X X , first(X)
+        # X -> . a , z
 
     def _find_follow(self, item: Item) -> set[str]:
+        """ 
+            Finds the follow() of a symbol\n
+            The follow() is the set of terminals that can appear after a symbol within a rule\n
+            Includes any cases where the symbol may be optional, repetitive, or the last symbol in a rule\n
+            Look-ahead should be included within the item parameter in cases where there is no symbol to the right\n
+
+            Parameters:
+            item (Item): Item class expects ("rhs": str, "i": int, "Look-ahead": str)
+
+            Returns:
+            set[str]: returns a set of terminals symbols that could possibly follow a symbol in a rule
+        """
         terminals = set()
 
-        if self._grammer._is_repetitive(item.RHS[item.i]):
-            terminals |= self._find_first(item.RHS[item.i])
+        if Grammar._is_repetitive(item.rhs[item.pos]):
+            terminals |= self._find_first(item.rhs[item.pos])
 
-        if item.i + 1 >= len(item.RHS):
+        if item.pos + 1 >= len(item.rhs):
             terminals |= item.lookahead
             return terminals
 
-        terminals |= self._find_first(item.RHS[item.i + 1])
+        terminals |= Grammar._find_first(item.rhs[item.pos + 1])
 
-        if self._grammer._is_optional(item.RHS[item.i]):
-            self._find_follow(item, item.i + 1)
-
-        return terminals
-
-    # removing symbol at the top is important here 
-    # we want the symbol to be tagless for the entire method
-    # OTHER than when we call is_optional(), 
-    # which works since the symbols (s) still has tags during the nested for loop
-    def _find_first(self, symbol: str, seen: set = None) -> set[str]:
-        """
-            Finds the terminal symbols that can expand from a symbol\n
-            Will automatically remove any tags from the symbol\n
-            E.g {<specifier-qualifier>}* -> <specifier-qualifier> which is how the LHS is represented in the BNF\n
-
-            Parameters:\n
-            symbol (str): The symbol you want to find the terminals of
-            seen (set): Default Parameter. Avoid passing this argument outside the method. Used to avoid infinite expansions\n
-
-            returns:\n
-            list[str]: strings representing terminal symbols
-        """
-        if seen is None: seen = set()
-        symbol = self._grammer._remove_tags(symbol)
-
-        if symbol in seen: return set()
-        if self._grammer._is_terminal(symbol): return set([symbol])
-
-        seen.add(symbol)
-        terminals = set()
-
-        for RHS in self._grammer._rules[symbol]:
-            for s in RHS:
-                terminals |= self._find_first(s, seen)
-                if not self._grammer._is_optional(s): break
+        if Grammar._is_optional(item.rhs[item.pos]):
+            self._find_follow(item, item.pos + 1)
 
         return terminals
+
+class State:
+
+    def __init__(self):
+        self._item_sets: list[Item] = []
+        self.transitions: {str, State} = {}
+
+    def _cmp_(self, state: State):
+        for i in len(self._item_sets):
+            item1 = self._item_sets[i]
+            item2 = state._item_sets[i]
+            
+            if not item1.cmp(item2):
+                return False
+        return True
+
+class TableGenerator:
+    def __init__(self, BNF_file, output_file = None):
+        self.Grammar(BNF_file)
+        self._states: list[list[self.Item]] = [] 
+        self._stack = ["$"]
 
 def main():
     table = TableGenerator("PARSING/BNF.txt")
-    print(table._find_follow(table.Item(RHS=["{<external-declaration>}*"], i=0, lookahead=set("$"))))
+    table2 = TableGenerator("PARSING/BNF.txt")
+    Grammar._print_rules()
 
 if __name__ == "__main__":
     main()
 
-#____________________________________________________________________________________________________________
-# have to handle repetition, optionals, far right closures (just give previous look-ahead...)
 
-#_____________________________________________________________________________________________________________
-# if its an optional... we want to ALSO do the thing do the symbol after it
-# if its a repetition... we want to ALSO do the thing as IF the next symbol was the closure 
+    # OPTIONAL FIX:
 
-# OPTIONAL CLOSURE
-# . {<pointer>}? <direct-declarator>
-# . <direct-declarator>
+    # if we have z, send it to a new state (what if we already have a state for that input...)
+    # 1.)
+    # A -> y . (X?)
+    # A -> y .        (skipping x)  (follow() of A will become the look-ahead for y z .)
+    # X -> . a        (expanding x) (needs z as a look-ahead to perform reduce)
 
-# REPETITION CLOSURE
-# {<specifier-qualifier>}+ {<abstract-declarator>}?
-# . {<specifier-qualifier>}+ {<abstract-declarator>}?
-# look-ahead for <specifier-qualifier, sends it so the same state, eg . {<specifier-qualifier>}+ {<abstract-declarator>}?
-# look-ahead for {<abstract-declarator>} or follow(LHS) sends it to 2 different states
+    # decide between reducing/shifting? reduce x from nothing, or from a
+    # 2.)
+    # A -> y . (X?) z
+    # X -> . , z        (skipping x)  (look-ahead should be follow() of A)
+    # X -> . a          (expanding x) (look-ahead should be z or first() of z)
 
-#_________________________________________________________________________________________________________________________________________
-
-# closure
-#   - add all rules where the symbol appears on the LHS
-#       - Need to include support for optionals
-#       - Need to include support for repetitions 
-
-# follow()
-#   - get first() possible terminals AFTER the closure symbol
-#       - Need to include support for optionals
-#       - Need to include support for repetitions 
-#       - need to include support for far-right symbols
-# _____________________________________________________________________________________________________
-
-# what happens if a closure is optional?
-#   - perform closure on both the optional and the symbol after, assuming its non-terminal
-
-# what happens if a closure if on the far right?
-#   - the look-ahead will stay the same as the current rule, eg S -> a.X, $  lookahead = $
-
-# what happens if a closure is repetitive?
-#   we must consider both cases if closure symbol appears once or more
+    # paths to different states should never share the same input (probably combine the states if they do)
+    # look-ahead merely resolves shift/reduce
+# __________________________________________________________________________________________________________________
 
 # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list

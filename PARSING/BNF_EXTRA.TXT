@@ -1,5 +1,5 @@
   S' ::= <translation-unit> $
-
+  
   1.) <translation-unit> ::= {<external-declaration>}*
 
   2.) <external-declaration> ::= <function-definition>     
