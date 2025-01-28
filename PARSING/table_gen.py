@@ -2,15 +2,18 @@ from __future__ import annotations
 from collections import namedtuple
 
 class InputError(Exception):
-    def __init__(self, message: str, input_value: str = None) -> None:
+    MSG_NO_LHS = "Missing Left-hand side (lhs) definition before expansion"
+    MSG_BAD_INPUT = "Invalid format, expected either " \
+                         "'<symbol> ::= ...' or '| ...'"
+
+    def __init__(self, message: str, line_num:str, input_value:str) -> None:
         super().__init__(message)
         self.input_value = input_value
+        self.line_num = line_num
 
     def __str__(self) -> str:
-        if self.input_value is not None:
-            return f"{self.args[0]} (Invalid input: {self.input_value})"
-        
-        return self.args[0]
+        line_text = f'{self.input_value.lstrip().rstrip()}'
+        return f"Line number {self.line_num}: {self.args[0]} -> {line_text})"
 
 class Singleton(type):
     _instance = None
@@ -20,10 +23,21 @@ class Singleton(type):
             cls._instance = super(Singleton, cls).__call__(*args, **kwargs)
         return cls._instance
 
-Rule = namedtuple("Rule", ["lhs", "expansions"])
+Rule = namedtuple("Rule", ["lhs", "rhs"])
+
+# TODO ISSUES TO SOLVE
+# give only tag characters
+
+# Grammar that is not LALR
+#   - Ambigious grammar (look-ahead conflict)
+#   - Left recursive (infinite recursion, in SOME cases)
+
 
 class Grammar(metaclass=Singleton):
     _rules: dict[str, list[str]] = {}
+    TAGS = ['{', '}', '+', '*', '?']
+    OPTIONAL_TAGS = ['*', '?']
+    REPETITION_TAGS = ['*', '+']
 
     def __init__(self, filename: str) -> None:
         self._parse_grammar(filename)
@@ -40,27 +54,27 @@ class Grammar(metaclass=Singleton):
 
             Returns: None 
         """
-        with open(filename, 'r') as file:
+        with open(filename, 'r') as file: 
             lhs = None
 
-            for line in file:        
+            for line_num, line in enumerate(file, start=1):        
                 substrs: list[str] = line.split()
 
                 # A valid grammar rule will always have 3 parts:  LSH ::= RHS
                 if len(substrs) >= 3 and substrs[1] == "::=":
                     lhs = substrs[0]
-                    expansion = substrs[2:]
-                    cls._rules[lhs] = [expansion]
+                    rhs = substrs[2:]
+                    cls._rules[lhs] = [rhs]
 
                 # An empty RHS can be valid if it's not the only expansion
                 elif len(substrs) >= 1 and substrs[0] == '|':
                     if not lhs:
-                        raise InputError("No lhs has been defined prior to this expansion", substrs)
-                    expansion = substrs[1:]
-                    cls._rules[lhs].append(expansion)
+                        raise InputError(InputError.MSG_NO_LHS, line_num, line)
+                    rhs = substrs[1:]
+                    cls._rules[lhs].append(rhs)
                 
                 elif substrs:
-                    raise InputError("Invalid input", substrs)
+                    raise InputError(InputError.MSG_BAD_INPUT, line_num, line)
 
     @classmethod
     def _is_terminal(cls, symbol: str) -> bool:
@@ -71,26 +85,32 @@ class Grammar(metaclass=Singleton):
 
             Returns: bool
         """
+        symbol = cls.remove_tags(symbol)
         return symbol not in cls._rules 
 
     @classmethod
-    def remove_tags(symbol: str) -> str:
+    def remove_tags(cls, symbol: str) -> str:
         """ Removes punctuation, tags, and extra information from the base symbol \n
             E.g {<assignment-operator}* --> <assignment-operator>
 
             Parameter: symbol(str)
             Returns: str 
         """
-        left: int = None
-        right: int = None
+        if len(symbol) == 1:
+            return symbol
 
-        for i in range(len(symbol)):
-            if symbol[i] == '<': left = i
-            if (symbol[i] == '>'): right = i
+        left:int = 0
+        right:int = len(symbol) - 1
+
+        while left < len(symbol) and symbol[left] in cls.TAGS:
+            left += 1
+        while right >= 0 and symbol[right] in cls.TAGS:
+            right -= 1
+
+        if right < left:
+            raise RuntimeError(f"symbol '{symbol}' contains only tag characters")
         
-        if left and right:  
-            return symbol[left : right + 1]
-        return symbol
+        return symbol[left : right + 1]
 
     @classmethod
     def find_first(cls, symbol: str, seen: set = None) -> set[str]:
@@ -131,12 +151,12 @@ class Grammar(metaclass=Singleton):
             Returns: bool
         """
         return (
-            symbol[-1] in {"?", "*"} or 
+            (len(symbol) > 1 and symbol[-1] in cls.OPTIONAL_TAGS) or 
             ("ε" in cls._rules.get(symbol, []))
         )
 
     @classmethod
-    def is_repetitive(symbol: str) -> bool:
+    def is_repetitive(cls, symbol: str) -> bool:
         """
             Returns true if a symbol can occur an arbitrary number of times\n
             e.g contains the tag '+' or '*'\n
@@ -145,13 +165,7 @@ class Grammar(metaclass=Singleton):
 
             returns: bool
         """
-        return (
-            "<" in symbol and ">" in symbol and
-            (
-                symbol[-1] == "+" or
-                symbol[-1] == "*"
-            )
-        )
+        return len(symbol) > 1 and symbol[-1] in cls.REPETITION_TAGS
 
     @classmethod
     def print_rules(cls) -> None:
@@ -162,17 +176,16 @@ class Grammar(metaclass=Singleton):
 
             Returns: None
         """
-        for lhs, expansions in cls._rules.items():
+        for lhs, rhs in cls._rules.items():
             print("\n" + lhs)
-            for e in expansions:
-                print("    " + str(e))
+            for symbol in rhs:
+                print("    " + str(symbol))
 
 class Item:
 
     # dot position refers to the progress made in completing a grammer rule
-    def __init__(self, lhs: str, rhs: list[str], dot_pos: int, lookahead: set[str]):
-        self.lhs = lhs
-        self.rhs = rhs
+    def __init__(self, rule: Rule, dot_pos: int, lookahead: set[str]):
+        self.rule = rule
         self.pos = dot_pos
         self.lookahead = lookahead 
 
@@ -187,8 +200,9 @@ class Item:
             Includes any cases where the symbol may be optional, repetitive, or the last symbol in a rule\n
             Look-ahead should be included within the item parameter in cases where there is no symbol to the right\n
 
-            Parameters:
-            item (Item): Item class expects ("rhs": str, "i": int, "Look-ahead": str)
+            Parameters:\n
+            item (Item)\n
+            offset (int) (Only intended for internal use) Offset shifts the progress position of rule forward. \n
 
             Returns:
             set[str]: returns a set of terminals symbols that could possibly follow a symbol in a rule
@@ -244,6 +258,13 @@ class Item:
         return new_items
 
 class State:
+    #TODO will do numbers states (easier to debug, less complex, humans can read numbers)
+
+    #TODO decice how states will map transitions and completed rules
+
+    # Interface needs to return either a STATE or a RULE
+    # State = SHIFT
+    # RULE = REDUCE
 
     # core represents the intial starter item within a set prior to closure
     def __init__(self, core: Item):
@@ -278,14 +299,12 @@ class State:
 
 class TableGenerator(metaclass=Singleton):
 
-    # states: dict[str, State] = {}
-    # goto_table: list[list[]]
-
     def __init__(self, BNF_file, output_file = None):
         self.Grammar = Grammar(BNF_file)
 
 def main():
     table = TableGenerator("PARSING/BNF.txt")
+    print(Grammar.find_first("<translation-unit>"))
 
 if __name__ == "__main__":
     main()
