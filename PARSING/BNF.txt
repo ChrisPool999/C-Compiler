@@ -1,5 +1,3 @@
-S' ::= <translation-unit> $
-
 <translation-unit> ::= {<external-declaration>}*
 
 <external-declaration> ::= <function-definition>          

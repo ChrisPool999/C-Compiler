@@ -1,10 +1,23 @@
 from __future__ import annotations
 from collections import namedtuple
 
+# TODO ISSUES TO SOLVE
+# give only tag characters
+
+# Grammar that is not LALR
+#   - Ambigious grammar (look-ahead conflict)
+#   - Left recursive (infinite recursion, in SOME cases)
+
 class InputError(Exception):
     MSG_NO_LHS = "Missing Left-hand side (lhs) definition before expansion"
-    MSG_BAD_INPUT = "Invalid format, expected either " \
+    MSG_BAD_FORMAT = "Invalid format, expected either " \
                          "'<symbol> ::= ...' or '| ...'"
+    MSG_EMPTY_BNF = "The grammer file is empty"
+
+    @classmethod
+    def MSG_item_OOB(self, lhs: str, rhs: str, pos: int):
+        return f"Rule '{lhs} ::= {rhs}': " \
+               f"the dot position {pos} is out of bounds"
 
     def __init__(self, message: str, line_num:str, input_value:str) -> None:
         super().__init__(message)
@@ -23,16 +36,6 @@ class Singleton(type):
             cls._instance = super(Singleton, cls).__call__(*args, **kwargs)
         return cls._instance
 
-Rule = namedtuple("Rule", ["lhs", "rhs"])
-
-# TODO ISSUES TO SOLVE
-# give only tag characters
-
-# Grammar that is not LALR
-#   - Ambigious grammar (look-ahead conflict)
-#   - Left recursive (infinite recursion, in SOME cases)
-
-
 class Grammar(metaclass=Singleton):
     _rules: dict[str, list[str]] = {}
     TAGS = ['{', '}', '+', '*', '?']
@@ -41,6 +44,16 @@ class Grammar(metaclass=Singleton):
 
     def __init__(self, filename: str) -> None:
         self._parse_grammar(filename)
+
+    @classmethod
+    def _get_start_symbol(cls, file) -> str:
+        first_line = file.readline().split()
+        file.seek(0)
+
+        if first_line:
+            return first_line[0]
+        
+        raise InputError(InputError.MSG_EMPTY_BNF) 
 
     @classmethod
     def _parse_grammar(cls, filename: str) -> None:
@@ -55,8 +68,9 @@ class Grammar(metaclass=Singleton):
             Returns: None 
         """
         with open(filename, 'r') as file: 
-            lhs = None
+            cls.START_SYMBOL = cls._get_start_symbol(file)                            
 
+            lhs = None
             for line_num, line in enumerate(file, start=1):        
                 substrs: list[str] = line.split()
 
@@ -66,7 +80,7 @@ class Grammar(metaclass=Singleton):
                     rhs = substrs[2:]
                     cls._rules[lhs] = [rhs]
 
-                # An empty RHS can be valid if it's not the only expansion
+                # An empty RHS can be valid if its not the first rule
                 elif len(substrs) >= 1 and substrs[0] == '|':
                     if not lhs:
                         raise InputError(InputError.MSG_NO_LHS, line_num, line)
@@ -74,10 +88,10 @@ class Grammar(metaclass=Singleton):
                     cls._rules[lhs].append(rhs)
                 
                 elif substrs:
-                    raise InputError(InputError.MSG_BAD_INPUT, line_num, line)
+                    raise InputError(InputError.MSG_BAD_FORMAT, line_num, line)
 
     @classmethod
-    def _is_terminal(cls, symbol: str) -> bool:
+    def is_terminal(cls, symbol: str) -> bool:
         """
             Returns true if a symbol can no longer expand\n
 
@@ -128,14 +142,16 @@ class Grammar(metaclass=Singleton):
         if seen is None: seen = set()
 
         if symbol in seen: return set()
-        if cls._is_terminal(symbol): return set([symbol])
+        if cls.is_terminal(symbol): return set([symbol])
 
         seen.add(symbol)
 
         terminals = set()
+        # first terminal can be from any rule
         for RHS in cls._rules[symbol]:
             for s in RHS:
                 terminals |= cls.find_first(s, seen)
+                # if optional, next symbol terminals are valid
                 if not cls.is_optional(s): break
 
         return terminals
@@ -181,24 +197,64 @@ class Grammar(metaclass=Singleton):
             for symbol in rhs:
                 print("    " + str(symbol))
 
+Rule = namedtuple("Rule", ["lhs", "rhs"])
+
 class Item:
 
-    # dot position refers to the progress made in completing a grammer rule
-    def __init__(self, rule: Rule, dot_pos: int, lookahead: set[str]):
-        self.rule = rule
-        self.pos = dot_pos
-        self.lookahead = lookahead 
+    @property
+    def lhs(self):
+        return self.rule.lhs
 
     @property
-    def symbol(self):
-        return self.rhs[self.pos]
+    def rhs(self):
+        if not isinstance(self.rule.rhs, list):
+            raise TypeError(f"RHS must be a list, it's a ({type(self.rule.rhs)}) rhs -> {self.rule.rhs}")
 
-    def _find_follow(self, offset: int = 0) -> set[str]:
+        return self.rule.rhs
+
+    # dot position refers to the progress made in completing a grammer rule
+    def __init__(self, rule: Rule, lookahead: set[str] = set(), pos: int = 0):
+        self.rule = rule
+        self.lookahead = lookahead 
+        self.pos = pos
+
+    def __eq__(self, other: Item) -> bool:
+        if not isinstance(other, Item):
+            raise RuntimeError(f"Trying to compare a class of Item with a {type(other)}")
+
+        # look-ahead can be different in LALR(1)
+        return (
+            self.lhs == other.lhs and   
+            self.rhs == other.rhs and 
+            self.pos == other.pos 
+        )   
+
+    def __hash__(self):
+        string = self.lhs
+        for s in self.rhs:
+            string += s
+        string += str(self.pos)
+        return hash(string) 
+
+    def print_item(self) -> None:
+        expansion = " "
+        for i in range(len(self.rhs)):
+            if i == self.pos:
+                expansion += " . "
+            expansion += self.rhs[i] + " "
+        
+        lookahead_list = ""
+        for terminal in self.lookahead:
+            lookahead_list += terminal + " "
+
+        print(self.lhs + " ::= " + expansion + ", " + lookahead_list)
+
+    def _find_follow(self, _offset: int = 0) -> set[str]:
         """ 
+
             Finds the follow() of a symbol\n
             The follow() is the set of terminals that can appear after a symbol within a rule\n
             Includes any cases where the symbol may be optional, repetitive, or the last symbol in a rule\n
-            Look-ahead should be included within the item parameter in cases where there is no symbol to the right\n
 
             Parameters:\n
             item (Item)\n
@@ -206,101 +262,115 @@ class Item:
 
             Returns:
             set[str]: returns a set of terminals symbols that could possibly follow a symbol in a rule
-        """
-        pos = self.pos + offset        
-        if pos >= len(self.rhs):
-            raise RuntimeError(f"'{self.lhs} ::= {self.rhs}': "
-                               f"the dot position {pos} is out of bounds")
+        """        
+        pos = self.pos + _offset
+        if pos >= len(self.rhs): 
+            raise IndexError(InputError.MSG_item_OOB(self.lhs, self.rhs, pos))
 
         terminals = set()
 
-        if Grammar.is_repetitive(self.rhs[pos]):
-            terminals |= self._find_first(self.rhs[pos])
+        # if the current symbol can repeat, the repeat would follow the current
+        curr_symbol = self.rhs[pos]
+        if Grammar.is_repetitive(curr_symbol):
+            terminals |= Grammar.find_first(curr_symbol)
 
-        if pos + 1 >= len(self.rhs):
+        # follow of the end symbol = follow of LHS/reduction = item's look-ahead
+        if pos == len(self.rhs) - 1:
             terminals |= self.lookahead
             return terminals
 
-        terminals |= Grammar.find_first(self.rhs[pos + 1])
+        next_symbol = self.rhs[pos + 1]
+        if Grammar.is_optional(next_symbol):
+            terminals |= self._find_follow(_offset + 1)
 
-        if Grammar.is_optional(self.rhs[pos + 1]):
-            terminals |= self._find_follow(offset + 1)
-
+        terminals |= Grammar.find_first(next_symbol)
         return terminals
 
     #TODO optimize duplicate work with cache
-    def closure(self) -> list[Item]:
+    #TODO also need to avoid having multiple of same item sets
+    def closure(self, seen = None) -> set[Item]:
         """
+
             Performs closure on a given item set. Returns all rules where the current symbol is on the LHS
             and applies closure to any rules returned
 
             Parameters: no parameters
 
             Return: list[Item] Returns a list of item sets that are produced from closure
-        """
-        new_items: list[Item] = []
+        """    
+        if not seen:
+            seen = set()
+
+        if len(self.rhs) == 0 or Grammar.is_terminal(self.rhs[self.pos] or self.lhs in seen):
+            return set()
+
+        seen.add(self.lhs)
+
         symbol = self.rhs[self.pos]
+        new_items = set()
         lookahead = self._find_follow()
-
+       
+        # symbol needs to be able to repeat any number of times
         if Grammar.is_repetitive(symbol):
-            tag = symbol[-1]
-            new_items += Item(symbol, f"{symbol} {symbol}{tag}", 0, lookahead)
+            recursive_rule = [symbol, symbol]
+            new_items.add(Item(Rule(symbol, recursive_rule), lookahead))
         
+        # empty set = Can produce optional symbols with no input 
         if Grammar.is_optional(symbol):
-            new_items += Item(symbol, [], 0, lookahead)
+            new_items.add(Item(Rule(symbol, []), lookahead))
 
-        for rhs in Grammar._rules[symbol]:
-            new_items += Item(symbol, rhs, 0, lookahead)
+        lhs = Grammar.remove_tags(symbol)
+        for rhs in Grammar._rules[lhs]:
+            new_items.add(Item(Rule(symbol, rhs), lookahead))
 
         for item in new_items:
-            new_items += self._closure(item)
+            new_items |= item.closure(seen)
 
         return new_items
 
 class State:
-    #TODO will do numbers states (easier to debug, less complex, humans can read numbers)
+    _state_lookup = {}
 
-    #TODO decice how states will map transitions and completed rules
-
-    # Interface needs to return either a STATE or a RULE
-    # State = SHIFT
-    # RULE = REDUCE
-
-    # core represents the intial starter item within a set prior to closure
+    # core represents the starting item set in a state, only item before closure
     def __init__(self, core: Item):
-        self._item_sets: list[Item] = [core]
-        self.transitions: {str, State} = {}
-        self.complete_rules: {str, Rule} = [] 
+        if self._find_state(core):
+            raise RuntimeError("State already exists. Shouldn't be intialized again")
+        
+        hash = self._get_state_hash(core)
+        self._state_lookup[hash] = self
 
-        self._item_sets += core._closure()
-        self._create_states()
+        self._items = set([core])
+        self.transitions: dict[str, State | Rule] = {}
 
-    def _lookup_state(self, item: Item) -> State:
-        core_hash = str(item.lhs + item.rhs + item.pos)
+        print(type(core.closure()))
+        exit()
 
-        if core_hash in self.transitions:
-            return self.transitions[core_hash]
+        self._items |= core.closure()
+        # self._create_states()
+
+    @staticmethod
+    def _get_state_hash(core: Item) -> str:
+        # lookahead is allowed to differ between matching states
+        return str(core.lhs + str(core.rhs) + str(core.pos))
+
+    @classmethod
+    def _find_state(cls, core: Item) -> State | None:
+        hash = cls._get_state_hash(core)
+        if hash in cls._state_lookup:
+            return cls._state_lookup[hash]
         return None
-
-    def _create_states(self):
-        for item in self._item_sets:
-
-            if item.pos >= len(item.rhs):
-                for value in item.lookahead:
-                    self.complete_rules[value] = Rule(lhs=item.lhs, expansions=item.rhs) 
-            else:            
-                core = Item(item.lhs, item.rhs, item.pos + 1, item.lookahead)
-                symbol = item.rhs[item.pos]
-
-                if self._lookup_state(core):
-                    self.transitions[symbol] = self._lookup_state(core)
-                else:
-                    self.transitions[symbol] = State(core)
 
 class TableGenerator(metaclass=Singleton):
 
-    def __init__(self, BNF_file, output_file = None):
-        self.Grammar = Grammar(BNF_file)
+    def __init__(self, file_name, output_file = None):
+        self.Grammar = Grammar(file_name)
+
+        lhs = "S'"
+        rhs = [Grammar.START_SYMBOL, "$"]
+        start_item = Item(Rule(lhs, rhs))
+
+        Grammar._rules[lhs] = [rhs] 
+        start_state = State(start_item)
 
 def main():
     table = TableGenerator("PARSING/BNF.txt")
@@ -310,3 +380,20 @@ if __name__ == "__main__":
     main()
 
 # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list
+
+
+
+    # def _create_states(self):
+    #     for item in self._items:
+
+    #         if item.pos >= len(item.rhs):
+    #             for value in item.lookahead:
+    #                 self.complete_rules[value] = Rule(lhs=item.lhs, expansions=item.rhs) 
+    #         else:            
+    #             core = Item(item.lhs, item.rhs, item.lookahead, item.pos + 1)
+    #             symbol = item.rhs[item.pos]
+
+    #             if self._lookup_state(core):
+    #                 self.transitions[symbol] = self._lookup_state(core)
+    #             else:
+    #                 self.transitions[symbol] = State(core)
