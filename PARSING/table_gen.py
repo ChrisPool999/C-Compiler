@@ -110,7 +110,7 @@ class Grammar(metaclass=Singleton):
             Parameter: symbol(str)
             Returns: str 
         """
-        if len(symbol) == 1:
+        if len(symbol) <= 2:
             return symbol
 
         left:int = 0
@@ -242,12 +242,14 @@ class Item:
             if i == self.pos:
                 expansion += " . "
             expansion += self.rhs[i] + " "
-        
+        if (self.pos >= len(self.rhs)):
+            expansion += " . "
+
         lookahead_list = ""
         for terminal in self.lookahead:
             lookahead_list += terminal + " "
 
-        print(self.lhs + " ::= " + expansion + ", " + lookahead_list)
+        print(self.lhs + " ::= " + expansion + "\n" + lookahead_list)
 
     def _find_follow(self, _offset: int = 0) -> set[str]:
         """ 
@@ -287,7 +289,6 @@ class Item:
         return terminals
 
     #TODO optimize duplicate work with cache
-    #TODO also need to avoid having multiple of same item sets
     def closure(self, seen = None) -> set[Item]:
         """
 
@@ -301,19 +302,21 @@ class Item:
         if not seen:
             seen = set()
 
-        if len(self.rhs) == 0 or Grammar.is_terminal(self.rhs[self.pos] or self.lhs in seen):
+        if self.lhs in seen:
             return set()
-
-        seen.add(self.lhs)
+        seen.add(self)
+        
+        if len(self.rhs) == 0 or self.pos >= len(self.rhs) or Grammar.is_terminal(self.rhs[self.pos]):
+            return set()
+    
+        new_items = set()
 
         symbol = self.rhs[self.pos]
-        new_items = set()
         lookahead = self._find_follow()
        
         # symbol needs to be able to repeat any number of times
         if Grammar.is_repetitive(symbol):
-            recursive_rule = [symbol, symbol]
-            new_items.add(Item(Rule(symbol, recursive_rule), lookahead))
+            new_items.add(Item(Rule(symbol, [symbol, symbol]), lookahead))
         
         # empty set = Can produce optional symbols with no input 
         if Grammar.is_optional(symbol):
@@ -323,42 +326,47 @@ class Item:
         for rhs in Grammar._rules[lhs]:
             new_items.add(Item(Rule(symbol, rhs), lookahead))
 
-        for item in new_items:
+        while new_items - seen:
+            item = (new_items - seen).pop()
             new_items |= item.closure(seen)
 
         return new_items
 
 class State:
-    _state_lookup = {}
+    _state_map = {}
+
+    def print_state(self) -> None:
+        for item in self._items:
+            item.print_item()
+        print("\n\n\n")
 
     # core represents the starting item set in a state, only item before closure
     def __init__(self, core: Item):
-        if self._find_state(core):
+        if core in self._state_map:
             raise RuntimeError("State already exists. Shouldn't be intialized again")
         
-        hash = self._get_state_hash(core)
-        self._state_lookup[hash] = self
-
+        self._state_map[core] = self
         self._items = set([core])
-        self.transitions: dict[str, State | Rule] = {}
-
-        print(type(core.closure()))
-        exit()
+        self.transitions = {}
+        self.reductions = {}
 
         self._items |= core.closure()
-        # self._create_states()
+        self._create_states()
 
-    @staticmethod
-    def _get_state_hash(core: Item) -> str:
-        # lookahead is allowed to differ between matching states
-        return str(core.lhs + str(core.rhs) + str(core.pos))
+    def _create_states(self):
+        for item in self._items:
 
-    @classmethod
-    def _find_state(cls, core: Item) -> State | None:
-        hash = cls._get_state_hash(core)
-        if hash in cls._state_lookup:
-            return cls._state_lookup[hash]
-        return None
+            if item.pos >= len(item.rhs):
+                for value in item.lookahead:
+                    self.reductions[value] = Rule(item.lhs, item.rhs) 
+            else:            
+                core = Item(Rule(item.lhs, item.rhs), item.lookahead, item.pos + 1)
+                symbol = item.rhs[item.pos]
+
+                if core in self._state_map:
+                    self.transitions[symbol] = self._state_map[core]
+                else:
+                    self.transitions[symbol] = State(core)
 
 class TableGenerator(metaclass=Singleton):
 
@@ -372,28 +380,16 @@ class TableGenerator(metaclass=Singleton):
         Grammar._rules[lhs] = [rhs] 
         start_state = State(start_item)
 
+        i = 1
+        for key in State._state_map:
+            print(f"State {i}:")
+            i += 1
+            State._state_map[key].print_state()
+
 def main():
     table = TableGenerator("PARSING/BNF.txt")
-    print(Grammar.find_first("<translation-unit>"))
 
 if __name__ == "__main__":
     main()
 
 # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list
-
-
-
-    # def _create_states(self):
-    #     for item in self._items:
-
-    #         if item.pos >= len(item.rhs):
-    #             for value in item.lookahead:
-    #                 self.complete_rules[value] = Rule(lhs=item.lhs, expansions=item.rhs) 
-    #         else:            
-    #             core = Item(item.lhs, item.rhs, item.lookahead, item.pos + 1)
-    #             symbol = item.rhs[item.pos]
-
-    #             if self._lookup_state(core):
-    #                 self.transitions[symbol] = self._lookup_state(core)
-    #             else:
-    #                 self.transitions[symbol] = State(core)
