@@ -207,13 +207,19 @@ class Item:
 
     @property
     def rhs(self):
-        if not isinstance(self.rule.rhs, list):
-            raise TypeError(f"RHS must be a list, it's a ({type(self.rule.rhs)}) rhs -> {self.rule.rhs}")
-
         return self.rule.rhs
 
     # dot position refers to the progress made in completing a grammer rule
     def __init__(self, rule: Rule, lookahead: set[str] = set(), pos: int = 0):
+        if not isinstance(rule, Rule):
+            raise TypeError(f"rule must be a Rule type, it's a {type(rule)} rule -> {rule}")
+
+        if not isinstance(rule.rhs, list):
+            raise TypeError(f"RHS must be a list, it's a {type(rule.rhs)} RHS -> {rule.rhs}")
+        
+        if not isinstance(lookahead, set):
+            raise TypeError(f"lookahead must be a list, it's a {type(lookahead)} lookahead -> {lookahead}")        
+
         self.rule = rule
         self.lookahead = lookahead 
         self.pos = pos
@@ -370,24 +376,33 @@ class State:
 
 class TableGenerator(metaclass=Singleton):
 
-    def __init__(self, file_name, output_file = None):
-        self.Grammar = Grammar(file_name)
-
+    @staticmethod
+    def _get_augment_start() -> Item:
         lhs = "S'"
-        rhs = [Grammar.START_SYMBOL, "$"]
-        start_item = Item(Rule(lhs, rhs))
+        rhs = [Grammar.START_SYMBOL]
+        lookahead = set(["$"])
+        
+        return Item(Rule(lhs, rhs), lookahead)
 
-        Grammar._rules[lhs] = [rhs] 
-        start_state = State(start_item)
-
+    @staticmethod
+    def print_states() -> None:
         i = 1
         for key in State._state_map:
             print(f"State {i}:")
             i += 1
             State._state_map[key].print_state()
 
+    def __init__(self, file_name, output_file = None):
+        self.Grammar = Grammar(file_name)
+
+        start = self._get_augment_start()
+        Grammar._rules[start.lhs] = [start.rhs] 
+        start_state = State(start)
+
+        self.print_states()
+
 def main():
-    table = TableGenerator("PARSING/BNF.txt")
+    table = TableGenerator("PARSING/BNF_TEST.txt")
 
 if __name__ == "__main__":
     main()
