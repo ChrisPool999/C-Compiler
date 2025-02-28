@@ -12,6 +12,21 @@ class Item:
     def rhs(self):
         return self.rule.rhs
 
+    def print_item(self) -> None:
+        expansion = " "
+        for i in range(len(self.rhs)):
+            if i == self.pos:
+                expansion += " . "
+            expansion += self.rhs[i] + " "
+        if (self.pos >= len(self.rhs)):
+            expansion += " . "
+
+        lookahead_list = ""
+        for terminal in self.lookahead:
+            lookahead_list += terminal + " "
+
+        print(self.lhs + " ::= " + expansion + "\n" + lookahead_list)
+
     # dot position refers to the progress made in completing a grammer rule
     def __init__(self, rule: Rule, lookahead: set[str] = set(), pos: int = 0):
         if not isinstance(rule, Rule):
@@ -27,6 +42,7 @@ class Item:
         self.lookahead = lookahead 
         self.pos = pos
 
+    # eq & hash used to easily search for duplicates when performing recursive closure and follow 
     def __eq__(self, other: Item) -> bool:
         if not isinstance(other, Item):
             raise RuntimeError(f"Trying to compare a class of Item with a {type(other)}")
@@ -37,7 +53,7 @@ class Item:
             self.rhs == other.rhs and 
             self.pos == other.pos 
         )   
-
+    
     def __hash__(self):
         string = self.lhs
         for s in self.rhs:
@@ -45,8 +61,9 @@ class Item:
         string += str(self.pos)
         return hash(string) 
 
-    def print_item(self) -> None:
+    def item_as_str(self) -> str:
         expansion = " "
+        
         for i in range(len(self.rhs)):
             if i == self.pos:
                 expansion += " . "
@@ -58,7 +75,7 @@ class Item:
         for terminal in self.lookahead:
             lookahead_list += terminal + " "
 
-        print(self.lhs + " ::= " + expansion + "\n" + lookahead_list)
+        return self.lhs + " ::= " + expansion + ', ' + lookahead_list
 
     def _find_follow(self, _offset: int = 0) -> set[str]:
         """ 

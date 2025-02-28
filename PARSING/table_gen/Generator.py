@@ -3,24 +3,24 @@ from Item import Item
 from Utils import Singleton, Rule
 
 class State:
-    _state_map = {}
+    _state_edges = {}
 
     def print_state(self) -> None:
         for item in self._items:
             item.print_item()
-        print("\n\n\n")
+        print()
 
     # core represents the starting item set in a state, only item before closure
     def __init__(self, core: Item):
-        if core in self._state_map:
+        if core in self._state_edges:
             raise RuntimeError("State already exists. Shouldn't be intialized again")
         
-        self._state_map[core] = self
-        self._items = set([core])
+        self._state_edges[core] = self
+        self._items = [core]
         self.transitions = {}
         self.reductions = {}
 
-        self._items |= core.closure()
+        self._items += core.closure()
         self._create_states()
 
     def _create_states(self):
@@ -33,8 +33,8 @@ class State:
                 core = Item(Rule(item.lhs, item.rhs), item.lookahead, item.pos + 1)
                 symbol = item.rhs[item.pos]
 
-                if core in self._state_map:
-                    self.transitions[symbol] = self._state_map[core]
+                if core in self._state_edges:
+                    self.transitions[symbol] = self._state_edges[core]
                 else:
                     self.transitions[symbol] = State(core)
 
@@ -51,12 +51,12 @@ class TableGenerator(metaclass=Singleton):
     @staticmethod
     def print_states() -> None:
         i = 1
-        for key in State._state_map:
+        for key in State._state_edges:
             print(f"State {i}:")
             i += 1
-            State._state_map[key].print_state()
+            State._state_edges[key].print_state()
 
-    def __init__(self, file_name, output_file = None):
+    def __init__(self, file_name):
         self.Grammar = Grammar(file_name)
 
         start = self._get_augment_start()
@@ -73,3 +73,4 @@ if __name__ == "__main__":
     main()
 
 # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list
+# items should not be a set... causing it to print out of order
