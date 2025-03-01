@@ -114,8 +114,10 @@ class Item:
         terminals |= Grammar.find_first(next_symbol)
         return terminals
 
+    # def get_closure_items()
+
     #TODO optimize duplicate work with cache
-    def closure(self, seen = None) -> set[Item]:
+    def closure(self, seen = None) -> list[Item]:
         """
 
             Performs closure on a given item set. Returns all rules where the current symbol is on the LHS
@@ -128,32 +130,33 @@ class Item:
         if not seen:
             seen = set()
 
-        if self.lhs in seen:
-            return set()
-        seen.add(self)
+        if self.lhs in seen: return []
         
         if len(self.rhs) == 0 or self.pos >= len(self.rhs) or Grammar.is_terminal(self.rhs[self.pos]):
-            return set()
+            return []
     
-        new_items = set()
-
+        new_items = []
         symbol = self.rhs[self.pos]
         lookahead = self._find_follow()
-       
+        seen.add(self)
+
         # symbol needs to be able to repeat any number of times
         if Grammar.is_repetitive(symbol):
-            new_items.add(Item(Rule(symbol, [symbol, symbol]), lookahead))
+            new_items.append(Item(Rule(symbol, [symbol, symbol]), lookahead))
         
         # empty set = Can produce optional symbols with no input 
         if Grammar.is_optional(symbol):
-            new_items.add(Item(Rule(symbol, []), lookahead))
+            new_items.append(Item(Rule(symbol, []), lookahead))
 
         lhs = Grammar.remove_tags(symbol)
         for rhs in Grammar._rules[lhs]:
-            new_items.add(Item(Rule(symbol, rhs), lookahead))
+            new_items.append(Item(Rule(symbol, rhs), lookahead))
 
-        while new_items - seen:
-            item = (new_items - seen).pop()
-            new_items |= item.closure(seen)
+        i = 0
+        while i < len(new_items):
+            item = new_items[i]
+            if item not in seen: 
+                new_items += item.closure(seen)
+            i += 1
 
         return new_items

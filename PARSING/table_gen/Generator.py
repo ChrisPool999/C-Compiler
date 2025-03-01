@@ -66,7 +66,7 @@ class TableGenerator(metaclass=Singleton):
         self.print_states()
 
 def main():
-    table = TableGenerator("./PARSING/BNF.txt")
+    table = TableGenerator("./PARSING/BNF_TEST.txt")
     pass
 
 if __name__ == "__main__":
