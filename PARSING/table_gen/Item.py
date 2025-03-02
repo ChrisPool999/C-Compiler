@@ -114,7 +114,31 @@ class Item:
         terminals |= Grammar.find_first(next_symbol)
         return terminals
 
-    # def get_closure_items()
+    def is_closure_invalid(self, seen: set):
+        return (len(self.rhs) == 0 
+            or self.pos >= len(self.rhs) 
+            or Grammar.is_terminal(self.rhs[self.pos])
+            or self.rhs[self.pos] in seen
+        )
+
+    def get_symbol_lhs(self) -> list[Item]:
+        new_items = []
+        symbol = self.rhs[self.pos]
+        lookahead = self._find_follow()
+
+        # symbol needs to be able to repeat any number of times
+        if Grammar.is_repetitive(symbol):
+            new_items.append(Item(Rule(symbol, [symbol, symbol]), lookahead))
+        
+        # empty rhs means we can create the LHS with no input needed
+        if Grammar.is_optional(symbol):
+            new_items.append(Item(Rule(symbol, []), lookahead))
+
+        lhs = Grammar.remove_tags(symbol)
+        for rhs in Grammar._rules[lhs]:
+            new_items.append(Item(Rule(symbol, rhs), lookahead))
+
+        return new_items
 
     #TODO optimize duplicate work with cache
     def closure(self, seen = None) -> list[Item]:
@@ -127,30 +151,12 @@ class Item:
 
             Return: list[Item] Returns a list of item sets that are produced from closure
         """    
-        if not seen:
-            seen = set()
+        if not seen: seen = set()
 
-        if self.lhs in seen: return []
-        
-        if len(self.rhs) == 0 or self.pos >= len(self.rhs) or Grammar.is_terminal(self.rhs[self.pos]):
-            return []
-    
-        new_items = []
-        symbol = self.rhs[self.pos]
-        lookahead = self._find_follow()
-        seen.add(self)
+        if self.is_closure_invalid(seen): return []
+        seen.add(self.rhs[self.pos])
 
-        # symbol needs to be able to repeat any number of times
-        if Grammar.is_repetitive(symbol):
-            new_items.append(Item(Rule(symbol, [symbol, symbol]), lookahead))
-        
-        # empty set = Can produce optional symbols with no input 
-        if Grammar.is_optional(symbol):
-            new_items.append(Item(Rule(symbol, []), lookahead))
-
-        lhs = Grammar.remove_tags(symbol)
-        for rhs in Grammar._rules[lhs]:
-            new_items.append(Item(Rule(symbol, rhs), lookahead))
+        new_items = self.get_symbol_lhs()
 
         i = 0
         while i < len(new_items):

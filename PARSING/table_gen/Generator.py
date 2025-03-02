@@ -73,4 +73,5 @@ if __name__ == "__main__":
     main()
 
 # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list
-# items should not be a set... causing it to print out of order
+# need to add lookahead items, if state already exists
+# have State lookup from core, add lookahead to it 
