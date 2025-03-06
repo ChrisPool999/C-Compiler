@@ -12,20 +12,24 @@ class Item:
     def rhs(self):
         return self.rule.rhs
 
-    def print_item(self) -> None:
+    @staticmethod
+    def get_rule_with_pos(item: Item) -> str:
         expansion = " "
-        for i in range(len(self.rhs)):
-            if i == self.pos:
+        for i in range(len(item.rhs)):
+            if i == item.pos:
                 expansion += " . "
-            expansion += self.rhs[i] + " "
-        if (self.pos >= len(self.rhs)):
+            expansion += item.rhs[i] + " "
+        if (item.pos >= len(item.rhs)):
             expansion += " . "
 
+        return item.lhs + " ::= " + expansion
+
+    def print_item(self) -> None:
         lookahead_list = ""
         for terminal in self.lookahead:
             lookahead_list += terminal + " "
 
-        print(self.lhs + " ::= " + expansion + "\n" + lookahead_list)
+        print(self.get_rule_with_pos(self) + "\n" + lookahead_list)
 
     # dot position refers to the progress made in completing a grammer rule
     def __init__(self, rule: Rule, lookahead: set[str] = set(), pos: int = 0):
@@ -55,27 +59,10 @@ class Item:
         )   
     
     def __hash__(self):
-        string = self.lhs
-        for s in self.rhs:
-            string += s
-        string += str(self.pos)
-        return hash(string) 
+        return hash(self.get_rule_with_pos(self)) 
 
-    def item_as_str(self) -> str:
-        expansion = " "
-        
-        for i in range(len(self.rhs)):
-            if i == self.pos:
-                expansion += " . "
-            expansion += self.rhs[i] + " "
-        if (self.pos >= len(self.rhs)):
-            expansion += " . "
-
-        lookahead_list = ""
-        for terminal in self.lookahead:
-            lookahead_list += terminal + " "
-
-        return self.lhs + " ::= " + expansion + ', ' + lookahead_list
+    def __repr__(self) -> str:
+        return Item.get_rule_with_pos(self)
 
     def _find_follow(self, _offset: int = 0) -> set[str]:
         """ 
