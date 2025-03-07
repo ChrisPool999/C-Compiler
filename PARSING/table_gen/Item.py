@@ -29,7 +29,7 @@ class Item:
         for terminal in self.lookahead:
             lookahead_list += terminal + " "
 
-        print(self.get_rule_with_pos(self) + "\n" + lookahead_list)
+        print(self.get_rule_with_pos(self) + ", " + lookahead_list)
 
     # dot position refers to the progress made in completing a grammer rule
     def __init__(self, rule: Rule, lookahead: set[str] = set(), pos: int = 0):

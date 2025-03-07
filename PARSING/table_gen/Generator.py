@@ -47,23 +47,10 @@ class State:
     def print_state(self) -> None:
         for item in self.core.items:
             item.print_item()
-        print("--------------------")
+        print()
         for item in self._items:
             item.print_item()
         print()
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     def __init__(self, items: Item | Core):
         if isinstance(items, Core):
@@ -77,6 +64,7 @@ class State:
         self._items = []
         self.edges = {}
         self.reductions = {}
+        State.state_map[hash(self.core)] = self
 
         for item in self.core.items:
             self._items += item.closure()           
@@ -109,6 +97,7 @@ class State:
 
                 if symbol not in edges:
                     edges[symbol] = Core(new_item)
+
                 else:
                     core = edges[symbol]
                     core.add(new_item)
@@ -116,32 +105,21 @@ class State:
         self._connect_states(edges) 
 
     def _merge_state(self, core: Core) -> None:
-        if len(self.items) != len(core.items):
+        if len(self.core.items) != len(core.items):
             raise RuntimeError("States should be identical length when merging")
 
-        for i in range(len(self.items)):
-            self.items[i].lookahead |= core.items[i].lookahead
+        for i in range(len(self.core.items)):
+            self.core.items[i].lookahead |= core.items[i].lookahead
 
     def _connect_states(self, edges: dict[str, Core]):
         for symbol, core in edges.items():
             if hash(core) in State.state_map:
-                # for item in State.state_map[hash(core)].items:
-                #     print(item)
-                # print()
-                # print(core)
-                # exit()
-                # ._merge_state(core)
+                State.state_map[hash(core)]._merge_state(core)
                 continue
 
             state = State(core)
-
             self.edges[symbol] = state
-            State.state_map[hash(core)] = state
-
             state._create_edges() 
-
-
-
 
 class TableGenerator(metaclass=Singleton):
 
@@ -172,9 +150,12 @@ class TableGenerator(metaclass=Singleton):
         self.print_states()
 
 def main():
-    table = TableGenerator("./PARSING/BNF_TEST.txt")
+    # table = TableGenerator("./PARSING/BNF_TEST.txt")
+    # table = TableGenerator("./PARSING/BNF_TEST2.txt")
     # table = TableGenerator("./PARSING/BNF.txt")
     pass
+    item = Item(Rule("E", ["E", "+", "T"]))
+    print(item._find_follow())
 
 if __name__ == "__main__":
     main()
