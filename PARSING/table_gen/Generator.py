@@ -1,7 +1,8 @@
 from __future__ import annotations
 from Grammar import Grammar
 from Item import Item
-from Utils import Singleton, Rule
+from Singleton import Singleton
+from Grammar import Rule
 
 class Core:
     def __init__(self, items: Item | list[Item]):
@@ -121,7 +122,7 @@ class State:
             self.edges[symbol] = state
             state._create_edges() 
 
-class TableGenerator(metaclass=Singleton):
+class Generator(metaclass=Singleton):
 
     @staticmethod
     def _get_augment_start() -> Item:
@@ -139,25 +140,18 @@ class TableGenerator(metaclass=Singleton):
             i += 1
             State.state_map[key].print_state()
 
-    def __init__(self, file_name):
-        self.Grammar = Grammar(file_name)
+    @staticmethod
+    def generate(file_name):
+        grammar = Grammar(file_name)
 
-        start = self._get_augment_start()
+        start = Generator._get_augment_start()
         Grammar._rules[start.lhs] = [start.rhs] 
         start_state = State(start)
         start_state._create_edges()
 
-        self.print_states()
-
-def main():
-    # table = TableGenerator("./PARSING/BNF_TEST.txt")
-    # table = TableGenerator("./PARSING/BNF_TEST2.txt")
-    # table = TableGenerator("./PARSING/BNF.txt")
-    pass
-    item = Item(Rule("E", ["E", "+", "T"]))
-    print(item._find_follow())
+        Generator.print_states()
 
 if __name__ == "__main__":
-    main()
+    Generator.generate("./PARSING/BNF_TEST.txt")
 
 # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list

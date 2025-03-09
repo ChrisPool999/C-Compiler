@@ -1,6 +1,6 @@
 from __future__ import annotations
-from Grammar import Grammar
-from Utils import Rule, InputError
+from Grammar import Grammar, Rule
+from Exceptions import InputError
 
 class Item:
 

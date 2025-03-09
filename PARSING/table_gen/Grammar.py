@@ -1,4 +1,8 @@
-from Utils import Singleton, InputError
+from collections import namedtuple
+from Exceptions import InputError
+from Singleton import Singleton
+
+Rule = namedtuple("Rule", ["lhs", "rhs"])
 
 class Grammar(metaclass=Singleton):
     _rules: dict[str, list[str]] = {}

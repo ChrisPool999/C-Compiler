@@ -1,5 +1,3 @@
-from collections import namedtuple
-
 class InputError(Exception):
     MSG_NO_LHS = "Missing Left-hand side (lhs) definition before expansion"
     MSG_BAD_FORMAT = "Invalid format, expected either " \
@@ -19,13 +17,3 @@ class InputError(Exception):
     def __str__(self) -> str:
         line_text = f'{self.input_value.lstrip().rstrip()}'
         return f"Line number {self.line_num}: {self.args[0]} -> {line_text})"
-
-class Singleton(type):
-    _instance = None
-    
-    def __call__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instance
-    
-Rule = namedtuple("Rule", ["lhs", "rhs"])
