@@ -5,7 +5,7 @@ from Singleton import Singleton
 Rule = namedtuple("Rule", ["lhs", "rhs"])
 
 class Grammar(metaclass=Singleton):
-    _rules: dict[str, list[str]] = {}
+    _rules: dict[str, list[list[str]]] = {}
     TAGS = ['{', '}', '+', '*', '?']
     OPTIONAL_TAGS = ['*', '?']
     REPETITION_TAGS = ['*', '+']
@@ -91,7 +91,7 @@ class Grammar(metaclass=Singleton):
 
         if right < left:
             raise RuntimeError(f"symbol '{symbol}' contains only tag characters")
-        
+
         return symbol[left : right + 1]
 
     @classmethod
@@ -151,16 +151,17 @@ class Grammar(metaclass=Singleton):
         """
         return len(symbol) > 1 and symbol[-1] in cls.REPETITION_TAGS
 
+    # used for testing and debugging
     @classmethod
-    def print_rules(cls) -> None:
-        """
-            Prints out the grammar rules
-
-            Parameters: None
-
-            Returns: None
-        """
+    def get_rules(cls) -> str:
+        result = ""
         for lhs, rhs in cls._rules.items():
-            print("\n" + lhs)
-            for symbol in rhs:
-                print("    " + str(symbol))
+            result += (lhs + " ::= ")
+            for l in rhs:
+                for s in l:
+                    result += (s + " ")
+                result += " | "
+
+            result = result[:-2] + '\n'
+
+        return result

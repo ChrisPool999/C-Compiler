@@ -1,8 +1,7 @@
 from __future__ import annotations
-from Grammar import Grammar
+from Grammar import Grammar, Rule
 from Item import Item
 from Singleton import Singleton
-from Grammar import Rule
 
 class Core:
     def __init__(self, items: Item | list[Item]):
@@ -45,13 +44,19 @@ class State:
     def items(self):
         return self._items
 
-    def print_state(self) -> None:
+    def get_states_info(self) -> str:
+        result = "Core:\n"
         for item in self.core.items:
-            item.print_item()
-        print()
+            result += (item.get_item_info() + "\n")
+        
+        if not len(self._items):
+            return result
+        
+        result += "\nItems:\n"
         for item in self._items:
-            item.print_item()
-        print()
+            result += (item.get_item_info() + "\n")
+        
+        return result
 
     def __init__(self, items: Item | Core):
         if isinstance(items, Core):
@@ -70,7 +75,7 @@ class State:
         for item in self.core.items:
             self._items += item.closure()           
 
-    def is_reduction_ambiguity(self, new_lookahead: set[str]) -> bool:
+    def is_reduction_ambiguous(self, new_lookahead: set[str]) -> bool:
         for item, old_lookahead in self.reductions.items():
             if len(new_lookahead | old_lookahead) != 0:
                 return False
@@ -83,7 +88,7 @@ class State:
         
         self.reductions[item] = item.lookahead
 
-        if self.is_reduction_ambiguity(item.lookahead):
+        if self.is_reduction_ambiguous(item.lookahead):
             raise RuntimeError("reduction/reduction ambiguity. Multiple reductions with same lookahead")
 
     def _create_edges(self) -> dict[str, Core]:
@@ -138,7 +143,7 @@ class Generator(metaclass=Singleton):
         for key in State.state_map:
             print(f"State {i}:")
             i += 1
-            State.state_map[key].print_state()
+            print(State.state_map[key].get_states_info())
 
     @staticmethod
     def generate(file_name):
@@ -152,6 +157,8 @@ class Generator(metaclass=Singleton):
         Generator.print_states()
 
 if __name__ == "__main__":
-    Generator.generate("./PARSING/BNF_TEST.txt")
+    filename = "./PARSING/parse_tables/BNF3.txt"
+    grammar = Grammar(filename)
+    Generator.generate(filename)
 
-# <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list
+# <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-listc

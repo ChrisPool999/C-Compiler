@@ -19,17 +19,20 @@ class Item:
             if i == item.pos:
                 expansion += " . "
             expansion += item.rhs[i] + " "
-        if (item.pos >= len(item.rhs)):
+        if (item.pos == len(item.rhs)):
             expansion += " . "
+
+        if item.pos > len(item.rhs):
+            raise RuntimeError("item position out of bounds")
 
         return item.lhs + " ::= " + expansion
 
-    def print_item(self) -> None:
+    def get_item_info(self) -> str:
         lookahead_list = ""
         for terminal in self.lookahead:
             lookahead_list += terminal + " "
 
-        print(self.get_rule_with_pos(self) + ", " + lookahead_list)
+        return (self.get_rule_with_pos(self) + ", " + lookahead_list)
 
     # dot position refers to the progress made in completing a grammer rule
     def __init__(self, rule: Rule, lookahead: set[str] = set(), pos: int = 0):
@@ -108,7 +111,7 @@ class Item:
             or self.rhs[self.pos] in seen
         )
 
-    def get_symbol_lhs(self) -> list[Item]:
+    def get_closure_items(self) -> list[Item]:
         new_items = []
         symbol = self.rhs[self.pos]
         lookahead = self._find_follow()
@@ -143,7 +146,7 @@ class Item:
         if self.is_closure_invalid(seen): return []
         seen.add(self.rhs[self.pos])
 
-        new_items = self.get_symbol_lhs()
+        new_items = self.get_closure_items()
 
         i = 0
         while i < len(new_items):
