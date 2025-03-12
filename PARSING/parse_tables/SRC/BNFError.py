@@ -1,4 +1,4 @@
-class InputError(Exception):
+class BNFError(Exception):
     MSG_NO_LHS = "Missing Left-hand side (lhs) definition before expansion"
     MSG_BAD_FORMAT = "Invalid format, expected either " \
                          "'<symbol> ::= ...' or '| ...'"

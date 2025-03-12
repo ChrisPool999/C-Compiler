@@ -1,6 +1,6 @@
 from __future__ import annotations
 from Grammar import Grammar, Rule
-from Exceptions import InputError
+from BNFError import BNFError
 
 class Item:
 
@@ -48,18 +48,6 @@ class Item:
         self.rule = rule
         self.lookahead = lookahead 
         self.pos = pos
-
-    # eq & hash used to easily search for duplicates when performing recursive closure and follow 
-    def __eq__(self, other: Item) -> bool:
-        if not isinstance(other, Item):
-            raise RuntimeError(f"Trying to compare a class of Item with a {type(other)}")
-
-        # look-ahead can be different in LALR(1)
-        return (
-            self.lhs == other.lhs and   
-            self.rhs == other.rhs and 
-            self.pos == other.pos 
-        )   
     
     def __hash__(self):
         return hash(self.get_rule_with_pos(self)) 
@@ -83,7 +71,7 @@ class Item:
         """        
         pos = self.pos + _offset
         if pos >= len(self.rhs): 
-            raise IndexError(InputError.MSG_item_OOB(self.lhs, self.rhs, pos))
+            raise IndexError(BNFError.MSG_item_OOB(self.lhs, self.rhs, pos))
 
         terminals = set()
 
@@ -133,7 +121,6 @@ class Item:
     #TODO optimize duplicate work with cache
     def closure(self, seen = None) -> list[Item]:
         """
-
             Performs closure on a given item set. Returns all rules where the current symbol is on the LHS
             and applies closure to any rules returned
 
@@ -147,6 +134,9 @@ class Item:
         seen.add(self.rhs[self.pos])
 
         new_items = self.get_closure_items()
+
+        if  self.pos + 1 < len(self.rhs) and Grammar.is_optional(self.rhs[self.pos]):
+            new_items += Item(Rule(self.lhs, self.rhs), set(), self.pos + 1).closure(seen)
 
         i = 0
         while i < len(new_items):

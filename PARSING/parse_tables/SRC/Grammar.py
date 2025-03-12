@@ -1,5 +1,5 @@
 from collections import namedtuple
-from Exceptions import InputError
+from BNFError import BNFError
 from Singleton import Singleton
 
 Rule = namedtuple("Rule", ["lhs", "rhs"])
@@ -21,7 +21,7 @@ class Grammar(metaclass=Singleton):
         if first_line:
             return first_line[0]
         
-        raise InputError(InputError.MSG_EMPTY_BNF) 
+        raise BNFError(BNFError.MSG_EMPTY_BNF) 
 
     @classmethod
     def _parse_grammar(cls, filename: str) -> None:
@@ -51,12 +51,12 @@ class Grammar(metaclass=Singleton):
                 # An empty RHS can be valid if its not the first rule
                 elif len(substrs) >= 1 and substrs[0] == '|':
                     if not lhs:
-                        raise InputError(InputError.MSG_NO_LHS, line_num, line)
+                        raise BNFError(BNFError.MSG_NO_LHS, line_num, line)
                     rhs = substrs[1:]
                     cls._rules[lhs].append(rhs)
                 
                 elif substrs:
-                    raise InputError(InputError.MSG_BAD_FORMAT, line_num, line)
+                    raise BNFError(BNFError.MSG_BAD_FORMAT, line_num, line)
 
     @classmethod
     def is_terminal(cls, symbol: str) -> bool:
@@ -135,7 +135,7 @@ class Grammar(metaclass=Singleton):
             Returns: bool
         """
         return (
-            (len(symbol) > 1 and symbol[-1] in cls.OPTIONAL_TAGS) or 
+            ((len(symbol)) > 1 and symbol[-1] in cls.OPTIONAL_TAGS) or 
             ("ε" in cls._rules.get(symbol, []))
         )
 
