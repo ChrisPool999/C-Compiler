@@ -11,52 +11,45 @@ class Grammar(metaclass=Singleton):
     REPETITION_TAGS = ['*', '+']
 
     def __init__(self, filename: str) -> None:
-        self._parse_grammar(filename)
-
-    @classmethod
-    def _get_start_symbol(cls, file) -> str:
-        first_line = file.readline().split()
-        file.seek(0)
-
-        if first_line:
-            return first_line[0]
-        
-        raise BNFError(BNFError.MSG_EMPTY_BNF) 
-
-    @classmethod
-    def _parse_grammar(cls, filename: str) -> None:
-        """
-            parse_grammar() will parse a textfile into a set of grammar rules\n
-            The format must be 'lhs ::= lhs' with any additional expansions
-            following each on a seperate line with the structure '| rhs'\n
-            Tags such as '+', '?' or '*' must be be immediately following the symbol
-
-            Parameters: filename (str)
-
-            Returns: None 
-        """
         with open(filename, 'r') as file: 
-            cls.START_SYMBOL = cls._get_start_symbol(file)                            
+            input = []
 
-            lhs = None
-            for line_num, line in enumerate(file, start=1):        
-                substrs: list[str] = line.split()
-
-                # A valid grammar rule will always have 3 parts:  LSH ::= RHS
-                if len(substrs) >= 3 and substrs[1] == "::=":
-                    lhs = substrs[0]
-                    rhs = substrs[2:]
-                    cls._rules[lhs] = [rhs]
-
-                # An empty RHS can be valid if its not the first rule
-                elif len(substrs) >= 1 and substrs[0] == '|':
-                    if not lhs:
-                        raise BNFError(BNFError.MSG_NO_LHS, line_num, line)
-                    rhs = substrs[1:]
-                    cls._rules[lhs].append(rhs)
+            for line_num, line in enumerate(file, start=1):   
+                if line_num == 1:
+                    Grammar.START_SYMBOL = line.split()[0]
                 
-                elif substrs:
-                    raise BNFError(BNFError.MSG_BAD_FORMAT, line_num, line)
+                input.append(line)
+
+            self._parse_grammar(input)
+
+    @classmethod
+    def _parse_grammar_line(cls, input: list[str], lhs = None) -> Rule:
+        if len(input) >= 3 and input[1] == "::=":
+            return Rule(input[0], input[2:])
+
+        elif len(input) >= 1 and input[0] == '|':
+            return Rule(lhs, input[1:])
+        
+        elif input:
+            raise BNFError(BNFError.MSG_EMPTY_BNF)
+
+    @classmethod 
+    def _parse_grammar(cls, BNF: list[str]) -> None:
+            lhs = None
+            for line in BNF:        
+                substrs = line.split()
+                if not substrs:
+                    continue
+
+                rule = cls._parse_grammar_line(substrs, lhs)
+
+                if lhs != rule.lhs:
+                    lhs = rule.lhs
+                
+                if lhs in cls._rules:
+                    cls._rules[lhs].append(rule.rhs)
+                else: 
+                    cls._rules[lhs] = [rule.rhs]
 
     @classmethod
     def is_terminal(cls, symbol: str) -> bool:

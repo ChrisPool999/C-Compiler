@@ -1,6 +1,5 @@
 from pathlib import Path
 import unittest
-import os
 
 from Singleton import Singleton
 from BNFError import BNFError
@@ -8,6 +7,22 @@ from Grammar import Grammar, Rule
 from Item import Item
 from Generator import Generator, State, Core
 import pytest
+from unittest.mock import mock_open, patch
+import tempfile
+
+# Grammar
+#   parsing rules
+#   start symbol
+
+# Item
+#  find_follow gives right look ahead
+#  terminal , optional, repetitive, remove tag
+#  closure 
+
+# State
+#   intial state is right
+#   manages to connect states
+#   avoids duplicates
 
 class TestGrammar(unittest.TestCase):
     
@@ -57,20 +72,49 @@ def cmp_item(item: Item, lhs: str, rhs: list[str], lookahead: set = set(), pos: 
         item.pos == pos
     )
 
+def parse_item(item: str) -> Item:
+
+    lhs = item.split()[0]
+
+    lookahead_start = str.find(',')
+    if lookahead_start == -1:
+        lookahead = set()
+    else:
+        lookahead = set(item[lookahead_start + 1 :].split())
+
+    rhs_start = str.find("::=")
+
+    rhs = item[rhs_start + 3 : lookahead_start].split()
+    pos = rhs.index(".")
+    if pos == -1:
+        pos = 0
+
+    item = item.replace('.', '')
+    rhs = item[rhs_start + 3 : lookahead_start].split()
+
+    return Item(Rule(lhs, rhs), lookahead, pos)
+    
+def config_Grammar(grammar: str, map = {}):
+    with tempfile.NamedTemporaryFile(mode='w+', delete=True) as temp_file:
+        temp_file.write(str)
+        temp_file.seek(0)
+
 class TestItem(unittest.TestCase):
     
+    # paste the entire grammar as string and parse it with grammar 
+    # paste items in 
 
     def test_closure(self):
 
-        Grammar._rules["S"] = ["X", "X"]
-        Grammar._rules["X"] = [
-            ["a", "X"], 
-            ["b"]
-        ]
-        item = Item(Rule("S", ["X", "X"]))
-        res = item.closure()
-        assert cmp_item(res[0], "X", ["a", "X"], set(["a", "b"]), 0)
-        assert cmp_item(res[1], "X", ["b"], set(["a", "b"]), 0)
+        mock_file = mock_open(read_data=""
+        "S ::= X X"
+        "X ::= a X"
+        "| b")
+        grammer = Grammar(mock_file)
+
+        res = parse_item("x ::= X X").closure()
+        assert cmp_item(res[0], parse_item("X ::= . a X , a b"))
+        assert cmp_item(res[0], parse_item("X ::= . b , a b"))
 
         Grammar._rules = {}
         Grammar._rules["<declaration-specifier>"] = [
