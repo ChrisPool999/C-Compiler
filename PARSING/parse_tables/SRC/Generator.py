@@ -147,7 +147,8 @@ class Generator(metaclass=Singleton):
 
     @staticmethod
     def generate(file_name):
-        grammar = Grammar(file_name)
+        grammar = Grammar()
+        grammar.parse_file(file_name)
 
         start = Generator._get_augment_start()
         Grammar._rules[start.lhs] = [start.rhs] 
@@ -158,7 +159,6 @@ class Generator(metaclass=Singleton):
 
 if __name__ == "__main__":
     filename = "./PARSING/parse_tables/BNF1.txt"
-    grammar = Grammar(filename)
     Generator.generate(filename)
 
 # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-listc
