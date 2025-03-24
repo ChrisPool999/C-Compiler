@@ -27,13 +27,6 @@ class Item:
 
         return item.lhs + " ::= " + expansion
 
-    def get_item_info(self) -> str:
-        lookahead_list = ""
-        for terminal in self.lookahead:
-            lookahead_list += terminal + " "
-
-        return (self.get_rule_with_pos(self) + ", " + lookahead_list)
-
     # dot position refers to the progress made in completing a grammer rule
     def __init__(self, rule: Rule, lookahead: set[str] = set(), pos: int = 0):
         if not isinstance(rule, Rule):
@@ -53,7 +46,11 @@ class Item:
         return hash(self.get_rule_with_pos(self)) 
 
     def __repr__(self) -> str:
-        return Item.get_rule_with_pos(self)
+        lookahead_list = ""
+        for terminal in self.lookahead:
+            lookahead_list += terminal + " "
+
+        return (self.get_rule_with_pos(self) + ", " + lookahead_list)
 
     def _find_follow(self, _offset: int = 0) -> set[str]:
         """ 
@@ -99,7 +96,7 @@ class Item:
             or self.rhs[self.pos] in seen
         )
 
-    def get_closure_items(self) -> list[Item]:
+    def _get_closure_items(self) -> list[Item]:
         new_items = []
         symbol = self.rhs[self.pos]
         lookahead = self._find_follow()
@@ -133,7 +130,7 @@ class Item:
         if self.is_closure_invalid(seen): return []
         seen.add(self.rhs[self.pos])
 
-        new_items = self.get_closure_items()
+        new_items = self._get_closure_items()
 
         if  self.pos + 1 < len(self.rhs) and Grammar.is_optional(self.rhs[self.pos]):
             new_items += Item(Rule(self.lhs, self.rhs), set(), self.pos + 1).closure(seen)

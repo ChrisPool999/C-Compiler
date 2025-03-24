@@ -44,17 +44,17 @@ class State:
     def items(self):
         return self._items
 
-    def get_states_info(self) -> str:
+    def __repr__(self) -> str:
         result = "Core:\n"
         for item in self.core.items:
-            result += (item.get_item_info() + "\n")
+            result += (str(item) + "\n")
         
         if not len(self._items):
             return result
         
         result += "\nItems:\n"
         for item in self._items:
-            result += (item.get_item_info() + "\n")
+            result += (str(item) + "\n")
         
         return result
 
@@ -143,7 +143,7 @@ class Generator(metaclass=Singleton):
         for key in State.state_map:
             print(f"State {i}:")
             i += 1
-            print(State.state_map[key].get_states_info())
+            print(State.state_map[key])
 
     @staticmethod
     def generate(file_name):
