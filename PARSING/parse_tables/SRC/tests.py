@@ -9,7 +9,7 @@ from Generator import Generator, State, Core
 from unittest.mock import mock_open, patch
 
 # Item
-#   closure (remove tag, terminal)
+#   closure (also tests find_follow)
 
 # State
 #   intial state is right
@@ -19,6 +19,7 @@ from unittest.mock import mock_open, patch
 class TestGrammar(unittest.TestCase):
 
     @classmethod
+    # helper for testing
     def make_new_grammar(cls, bnf: str) -> None:
         Grammar.START_SYMBOL = ""
         Grammar._rules = {}
@@ -89,84 +90,202 @@ class TestGrammar(unittest.TestCase):
         assert grammar.find_first("{X}+") == {'c', 'd', 'A', 'b', 'e'}   
         assert grammar.find_first("{X}+") == {'c', 'd', 'A', 'b', 'e'}   
 
-def cmp_item(item: Item, lhs: str, rhs: list[str], lookahead: set = set(), pos: int = 0) -> bool:
-    return (
-        item.lhs == lhs and
-        item.rhs == rhs and
-        item.lookahead == lookahead and
-        item.pos == pos
-    )
-
+# helper for testing item
 def parse_item(item: str) -> Item:
-
     lhs = item.split()[0]
 
-    lookahead_start = str.find(',')
+    rhs_start = item.find("::=")
+    if rhs_start == -1:
+        raise ValueError("Item missing '::='")
+    rhs_start += 3
+
+    lookahead_start = item.find(',')
     if lookahead_start == -1:
+        rhs = item[rhs_start :].split()
         lookahead = set()
     else:
+        rhs = item[rhs_start : lookahead_start].split()
         lookahead = set(item[lookahead_start + 1 :].split())
 
-    rhs_start = str.find("::=")
+    pos = 0
+    for i in range(len(rhs)):
+        if rhs[i] == ".":
+            pos = i
 
-    rhs = item[rhs_start + 3 : lookahead_start].split()
-    pos = rhs.index(".")
-    if pos == -1:
-        pos = 0
-
-    item = item.replace('.', '')
-    rhs = item[rhs_start + 3 : lookahead_start].split()
+    if "." in rhs:
+        rhs.remove(".")
 
     return Item(Rule(lhs, rhs), lookahead, pos)
     
-# class TestItem(unittest.TestCase):
+# helper for testing item
+def cmp_item(item: Item, item2: Item) -> bool:
+    return (
+        item.lhs == item2.lhs and
+        item.rhs == item2.rhs and
+        item.lookahead == item2.lookahead and
+        item.pos == item2.pos
+    )
+
+# helper for testing item
+def cmp_item_list(items: list[Item], values: list[str]) -> bool:
+    if len(items) != len(values):
+        raise ValueError("cmp_item_list is comparing item lists of two different sizes")
+
+    for i in range(len(items)):
+        if not cmp_item(items[i], parse_item(values[i])):
+            return False
+
+    return True   
+
+class TestItem(unittest.TestCase):
     
-    # def test_closure(self):
+    def test_closure_basic(self):
+        grammar = TestGrammar.make_new_grammar("""X ::= a X 
+                                               | b""")
+        item = parse_item("x ::= . X X, $")
+        closure_items = item.closure()
 
-        # res = parse_item("x ::= X X").closure()
-        # assert cmp_item(res[0], parse_item("X ::= . a X , a b"))
-        # assert cmp_item(res[0], parse_item("X ::= . b , a b"))
+        assert cmp_item_list(closure_items, [
+            "X ::= . a X , a b", 
+            "X ::= . b , a b"])
 
-        # Grammar._rules = {}
-        # Grammar._rules["<declaration-specifier>"] = [
-        #     ["<storage-class-specifier>"],
-        #     ["<type-specifier>"],
-        #     ["<type-qualifier>"]
-        # ]
-        # Grammar._rules["<declarator>"] = [
-        #     ["{<pointer>}?", "<direct-declarator>"]
-        # ]
-        # item = Item(Rule("<parameter-declaration>", ["{<declaration-specifier>}*", "<declarator>"]))
-        # for i in item.closure():
-        #     print(i)
+    def test_closure_result_loop(self):
+        grammar = TestGrammar.make_new_grammar("""A ::= B
+                                               B ::= c""")
+        item = parse_item("X ::= . A B, $")
+        closure_items = item.closure()
 
- 
-        # assert cmp_item(res[0], "{<declaration-specifier>}*", )
+        assert cmp_item_list(closure_items, [
+            "A ::= B , c", 
+            "B ::= c , c"])
+
+    def test_closure_option_tag(self):
+        grammar = TestGrammar.make_new_grammar("""B ::= b
+                                               C ::= c""")
+        item = parse_item("A ::= . {B}? C, $")
+        closure_items = item.closure()
+
+        assert cmp_item_list(closure_items, [
+            "{B}? ::=   . , c ", 
+            "{B}? ::=   . b , c",
+            "C ::= c, $"])
+
+    def test_closure_repetitive_tag(self):
+        grammar = TestGrammar.make_new_grammar("""B ::= b
+                                               C ::= c""")
+        item = parse_item("A ::= . {B}* C, $")
+        closure_items = item.closure()
+
+        assert cmp_item_list(closure_items, [
+            "{B}* ::=   . {B}* {B}* , b c",
+            "{B}* ::=   . , b c",
+            "{B}* ::=   . b , b c",
+            "C ::=   . c , $"])
+
+    #TODO FIX
+    def test_closure_plus_tag(self):
+        grammar = TestGrammar.make_new_grammar("""B ::= b
+                                               C ::= c""")
+        item = parse_item("A ::= . {B}+ C, $")
+        closure_items = item.closure()
+
+        assert cmp_item_list(closure_items, [
+            "{B}+ ::=   . {B}+ {B}* , c b",
+            "{B}+ ::=   . b , c b"])
+
+    def test_closure_final_symbol(self):
+        grammar = TestGrammar.make_new_grammar("""B ::= b
+                                               C ::= c""")
+        item = parse_item("A ::= . {B}? C, $")
+        closure_items = item.closure()
+
+        assert cmp_item_list(closure_items, [
+            "{B}? ::=   . , c ", 
+            "{B}? ::=   . b , c",
+            "C ::= c, $"])
+        
+        grammar = TestGrammar.make_new_grammar("""C ::= c""")
+        item = parse_item("A ::= . {C}? , $")
+        closure_items = item.closure()
+
+        assert cmp_item_list(closure_items, [
+            "{C}? ::=   . c , $ ", 
+            "{C}? ::=   . , $"])
+
+        grammar = TestGrammar.make_new_grammar("""C ::= c""")
+        item = parse_item("A ::= . {C}* , $")
+        closure_items = item.closure()
+
+        assert cmp_item_list(closure_items, [
+            "{C}* ::=   . {C}* {C}* , $ c", 
+            "{C}* ::=   . , $ c",
+            "{C}* ::=   . c , $"])
+
+        grammar = TestGrammar.make_new_grammar("""B ::= {D}? {c}?
+                                               D ::= c b""")
+        item = parse_item("A ::= . B , $")
+        closure_items = item.closure()
+
+        assert cmp_item_list(closure_items, [
+            "B ::=   . {D}? {c}? , $",
+            "{D}? ::=   . , $ c",
+            "{D}? ::=   . c b , $ c"])
+
+        grammar = TestGrammar.make_new_grammar("""B ::= {D}? {C}?
+                                               D ::= c b
+                                               C ::= c""")
+        item = parse_item("A ::= . B , $")
+        closure_items = item.closure()
+
+        assert cmp_item_list(closure_items, [
+            "B ::=   . {D}? {C}? , $"
+            "{D}? ::=   . , $ c"
+            "{D}? ::=   . c b , $ c" 
+            "{C}? ::=   . , $"
+            "{C}? ::=   . c , $"]) 
+
+        grammar = TestGrammar.make_new_grammar("""B ::= {b}?
+                                               | a
+                                               C ::= c""")
+        item = parse_item("A ::= . B C, $")
+        closure_items = item.closure()
+
+        assert cmp_item_list(closure_items, [
+            "B ::=   . {b}? , c",
+            "B ::=   . a , c",
+            "b ::=   . b* b* , c",
+            "b ::=   . , c"])
+        
+# c = TestItem()
+# c.test_closure_basic()
+# c.test_closure_result_loop()
+# c.test_closure_option_tag()
+# c.test_closure_repetitive_tag()
+# c.test_closure_plus_tag()
+# c.test_closure_final_symbol()
+
+#TODO ISSUES NEEDING FIXING
+"""
+- if symbol is final, lookahead not matching previous if closure above lost that lookahead
+
+- repetitive operator should generator . a+ a*, not . a+ a+ , as that is infinite
+
+- terminals not working with generating extra rules like x ::= . or x ::= x* x*
+
+- make sure if you have matching sets, you combine their lookahead, eg x = *b b
+    unsure about this one, wouldnt they be different items? check...
+"""
 
 
-        # res = item.closure()
-        # assert res[0].lhs == "X"
-        # assert res[0].rhs == ["a", "X"]
-        # assert res[0].pos == 0
-        # assert res[0].lookahead == {'a', 'b'}
-        # assert res[1].lhs == "X"
-        # assert res[1].rhs == ["b"]
-        # assert res[1].pos == 0
-        # assert res[1].lookahead == {'a', 'b'}
 
-c = TestGrammar()
-c.test_parsing_basic()
-c.test_parsing_spaces()
-c.test_parsing_tags()
-c.test_find_first_basic()
-c.test_find_first_tags()
-c.test_remove_tags()
 
-# class TestCore(unittest.TestCase):
-#     def test_add(self):
-#         pass
-#     def test__init__(self):
-#         pass
+# closure = put all rules where symbol is on LHS
+# if symbol is optional, need to do next symbol too
+# also do closure, for all item sets generated
+
+# LOOKAHEAD (find follow()):
+# if symbol is last, pass current lookahead
+# find next terminal that will occur after the symbol
 
 # class TestState(unittest.TestCase):
 #     def test__init__(self):
@@ -179,28 +298,3 @@ c.test_remove_tags()
 #         pass
 #     def test_connect_states(self):
 #         pass
-
-# def test_remove_tags(self):
-#     # only tags
-#     with pytest.raises(RuntimeError):
-#         Grammar.remove_tags("*****")
-#     with pytest.raises(RuntimeError):
-#         Grammar.remove_tags("++*++")
-
-#     # values <= 2
-#     assert Grammar.remove_tags(" ") == " "
-#     assert Grammar.remove_tags("") == ""
-#     assert Grammar.remove_tags("*") == "*"
-#     assert Grammar.remove_tags("+=") == "+="
-#     assert Grammar.remove_tags("+=*") == "="
-    
-#     assert Grammar.remove_tags("<>") == "<>"
-#     assert Grammar.remove_tags("<*>") == "<*>"
-#     assert Grammar.remove_tags("<foo>") == "<foo>"
-#     assert Grammar.remove_tags("<foo>*") == "<foo>"
-
-#     assert Grammar.remove_tags("{<external-declaration>}*") == "<external-declaration>"
-#     assert Grammar.remove_tags("{<expression>}?") == "<expression>"
-
-#     assert Grammar.remove_tags("{<foo>*}") == "<foo>"
-#     assert Grammar.remove_tags("{ <foo>* }") == " <foo>* "

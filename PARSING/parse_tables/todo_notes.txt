@@ -1,3 +1,8 @@
 change logic for removing tags
 bc we want ++ or += to be valid symbol
 but this conflicts with how we do remove_tag() logic
+
+should make alot of the code more unbreakable
+including tests
+
+refactor code, making more readable, modular

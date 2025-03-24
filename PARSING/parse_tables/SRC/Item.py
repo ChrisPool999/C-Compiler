@@ -126,7 +126,7 @@ class Item:
             Return: list[Item] Returns a list of item sets that are produced from closure
         """    
         if not seen: seen = set()
-
+        
         if self.is_closure_invalid(seen): return []
         seen.add(self.rhs[self.pos])
 
