@@ -96,18 +96,25 @@ class Item:
             or self.rhs[self.pos] in seen
         )
 
-    def _get_closure_items(self) -> list[Item]:
+    def _create_tag_sets(self, symbol: str, lookahead: set[str]) -> list[Item]:
         new_items = []
-        symbol = self.rhs[self.pos]
-        lookahead = self._find_follow()
 
         # symbol needs to be able to repeat any number of times
         if Grammar.is_repetitive(symbol):
-            new_items.append(Item(Rule(symbol, [symbol, symbol]), lookahead))
+            repetition_symbol = "{" + Grammar.remove_tags(symbol) + "}*"
+            new_items.append(Item(Rule(symbol, [symbol, repetition_symbol]), lookahead))
         
         # empty rhs means we can create the LHS with no input needed
         if Grammar.is_optional(symbol):
             new_items.append(Item(Rule(symbol, []), lookahead))
+
+        return new_items
+
+    def _get_closure_items(self) -> list[Item]:
+        symbol = self.rhs[self.pos]
+        lookahead = self._find_follow()
+
+        new_items = self._create_tag_sets(symbol, lookahead)
 
         lhs = Grammar.remove_tags(symbol)
         for rhs in Grammar._rules[lhs]:
@@ -127,13 +134,23 @@ class Item:
         """    
         if not seen: seen = set()
         
-        if self.is_closure_invalid(seen): return []
+        if self.pos < len(self.rhs) and Grammar.is_terminal(self.rhs[self.pos]) and Grammar.is_optional(self.rhs[self.pos]):                
+            if self.rhs[self.pos] in seen:
+                return []
+
+            new = self._create_tag_sets(self.rhs[self.pos], self.lookahead)
+            seen.add(self.rhs[self.pos])
+            return new
+
+        if self.is_closure_invalid(seen): 
+            return []
+        
         seen.add(self.rhs[self.pos])
 
         new_items = self._get_closure_items()
 
-        if  self.pos + 1 < len(self.rhs) and Grammar.is_optional(self.rhs[self.pos]):
-            new_items += Item(Rule(self.lhs, self.rhs), set(), self.pos + 1).closure(seen)
+        if self.pos + 1 < len(self.rhs) and Grammar.is_optional(self.rhs[self.pos]):
+            new_items += Item(Rule(self.lhs, self.rhs), self.lookahead, self.pos + 1).closure(seen)
 
         i = 0
         while i < len(new_items):

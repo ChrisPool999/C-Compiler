@@ -8,9 +8,6 @@ from Item import Item
 from Generator import Generator, State, Core
 from unittest.mock import mock_open, patch
 
-# Item
-#   closure (also tests find_follow)
-
 # State
 #   intial state is right
 #   manages to connect states
@@ -182,7 +179,6 @@ class TestItem(unittest.TestCase):
             "{B}* ::=   . b , b c",
             "C ::=   . c , $"])
 
-    #TODO FIX
     def test_closure_plus_tag(self):
         grammar = TestGrammar.make_new_grammar("""B ::= b
                                                C ::= c""")
@@ -209,8 +205,8 @@ class TestItem(unittest.TestCase):
         closure_items = item.closure()
 
         assert cmp_item_list(closure_items, [
-            "{C}? ::=   . c , $ ", 
-            "{C}? ::=   . , $"])
+            "{C}? ::=   . , $",
+            "{C}? ::=   . c , $"]) 
 
         grammar = TestGrammar.make_new_grammar("""C ::= c""")
         item = parse_item("A ::= . {C}* , $")
@@ -219,7 +215,7 @@ class TestItem(unittest.TestCase):
         assert cmp_item_list(closure_items, [
             "{C}* ::=   . {C}* {C}* , $ c", 
             "{C}* ::=   . , $ c",
-            "{C}* ::=   . c , $"])
+            "{C}* ::=   . c , $ c"])
 
         grammar = TestGrammar.make_new_grammar("""B ::= {D}? {c}?
                                                D ::= c b""")
@@ -229,7 +225,8 @@ class TestItem(unittest.TestCase):
         assert cmp_item_list(closure_items, [
             "B ::=   . {D}? {c}? , $",
             "{D}? ::=   . , $ c",
-            "{D}? ::=   . c b , $ c"])
+            "{D}? ::=   . c b , $ c",
+            "{c}? ::=   . , $"])
 
         grammar = TestGrammar.make_new_grammar("""B ::= {D}? {C}?
                                                D ::= c b
@@ -238,40 +235,26 @@ class TestItem(unittest.TestCase):
         closure_items = item.closure()
 
         assert cmp_item_list(closure_items, [
-            "B ::=   . {D}? {C}? , $"
-            "{D}? ::=   . , $ c"
-            "{D}? ::=   . c b , $ c" 
-            "{C}? ::=   . , $"
+            "B ::=   . {D}? {C}? , $",
+            "{D}? ::=   . , $ c",
+            "{D}? ::=   . c b , $ c", 
+            "{C}? ::=   . , $",
             "{C}? ::=   . c , $"]) 
 
-        grammar = TestGrammar.make_new_grammar("""B ::= {b}?
+        grammar = TestGrammar.make_new_grammar("""B ::= {b}*
                                                | a
                                                C ::= c""")
         item = parse_item("A ::= . B C, $")
         closure_items = item.closure()
 
         assert cmp_item_list(closure_items, [
-            "B ::=   . {b}? , c",
+            "B ::=   . {b}* , c",
             "B ::=   . a , c",
-            "b ::=   . b* b* , c",
-            "b ::=   . , c"])
+            "{b}* ::=   . {b}* {b}* , c",
+            "{b}* ::=   . , c"])
         
-# c = TestItem()
-# c.test_closure_basic()
-# c.test_closure_result_loop()
-# c.test_closure_option_tag()
-# c.test_closure_repetitive_tag()
-# c.test_closure_plus_tag()
-# c.test_closure_final_symbol()
-
 #TODO ISSUES NEEDING FIXING
 """
-- if symbol is final, lookahead not matching previous if closure above lost that lookahead
-
-- repetitive operator should generator . a+ a*, not . a+ a+ , as that is infinite
-
-- terminals not working with generating extra rules like x ::= . or x ::= x* x*
-
 - make sure if you have matching sets, you combine their lookahead, eg x = *b b
     unsure about this one, wouldnt they be different items? check...
 """
