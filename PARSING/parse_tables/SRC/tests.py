@@ -6,18 +6,10 @@ from BNFError import BNFError
 from Grammar import Grammar, Rule
 from Item import Item
 from Generator import Generator, State, Core
-import pytest
 from unittest.mock import mock_open, patch
-import tempfile
-
-# Grammar
-#   parsing rules
-#   start symbol
 
 # Item
-#  find_follow gives right look ahead
-#  terminal , optional, repetitive, remove tag
-#  closure 
+#   closure (remove tag, terminal)
 
 # State
 #   intial state is right
@@ -25,44 +17,77 @@ import tempfile
 #   avoids duplicates
 
 class TestGrammar(unittest.TestCase):
-    
-    def test_remove_tags(self):
-        # only tags
-        with pytest.raises(RuntimeError):
-            Grammar.remove_tags("*****")
-        with pytest.raises(RuntimeError):
-            Grammar.remove_tags("++*++")
 
-        # values <= 2
-        assert Grammar.remove_tags(" ") == " "
-        assert Grammar.remove_tags("") == ""
-        assert Grammar.remove_tags("*") == "*"
-        assert Grammar.remove_tags("+=") == "+="
-        assert Grammar.remove_tags("+=*") == "="
-        
-        assert Grammar.remove_tags("<>") == "<>"
-        assert Grammar.remove_tags("<*>") == "<*>"
-        assert Grammar.remove_tags("<foo>") == "<foo>"
-        assert Grammar.remove_tags("<foo>*") == "<foo>"
+    @classmethod
+    def make_new_grammar(cls, bnf: str) -> None:
+        Grammar.START_SYMBOL = ""
+        Grammar._rules = {}
+        grammar = Grammar()
 
-        assert Grammar.remove_tags("{<external-declaration>}*") == "<external-declaration>"
-        assert Grammar.remove_tags("{<expression>}?") == "<expression>"
+        grammar._parse_from_string(bnf.splitlines())
+        return grammar
 
-        assert Grammar.remove_tags("{<foo>*}") == "<foo>"
-        assert Grammar.remove_tags("{ <foo>* }") == " <foo>* "
+    def test_parsing_basic(self) -> None:
+        grammar = self.make_new_grammar("""S ::= X X
+            X ::= a X
+            | b""")
 
-    #TODO
-    def test_start_symbol(self):
-        mock_data = """ A ::= a a \
-                           | b
-                        
-                        b ::= c
-        """
-        pass
-    def test_find_first(self):
-        pass
-    def test_parse_grammar(self):
-        pass
+        assert grammar.START_SYMBOL == "S"
+        assert grammar._rules == {
+            "S" : [['X', 'X']],
+            "X" : [['a', 'X'], ['b']]
+        }
+
+    def test_parsing_spaces(self) -> None:
+        grammar = self.make_new_grammar("""X ::= A b
+
+            A ::= a X
+
+            | b""")
+
+        assert grammar.START_SYMBOL == "X"
+        assert grammar._rules == {
+            "X" : [['A', 'b']],
+            "A" : [['a', 'X'], ['b']]
+        }
+
+    def test_parsing_tags(self) -> None:
+        grammar = self.make_new_grammar("""G ::= B* {b}
+
+            B ::= c+ G?
+
+            | {f}*""")
+
+        assert grammar.START_SYMBOL == "G"
+        assert grammar._rules == {
+            "G" : [['B*', '{b}']],
+            "B" : [['c+', 'G?'], ['{f}*']]
+        }
+
+    def test_find_first_basic(self) -> None: 
+        grammar = self.make_new_grammar("""X ::= A b c
+        | d
+        | e f""")
+
+        assert grammar.find_first("X") == {"A", "d", "e"}
+
+    def test_find_first_tags(self) -> None: 
+        grammar = self.make_new_grammar("""X ::= {A}* {b}? c
+        | d
+        | {e}+ f""")
+
+        assert grammar.find_first("X") == {'c', 'd', 'A', 'b', 'e'}
+
+    def test_remove_tags(self) -> None: 
+        grammar = self.make_new_grammar("""X ::= {A}* {b}? c
+        | d
+        | {e}+ f""")
+
+        # find first will remove tags, to find the proper LHS name
+        assert grammar.find_first("{X}*") == {'c', 'd', 'A', 'b', 'e'}   
+        assert grammar.find_first("{X}*") == {'c', 'd', 'A', 'b', 'e'}   
+        assert grammar.find_first("{X}+") == {'c', 'd', 'A', 'b', 'e'}   
+        assert grammar.find_first("{X}+") == {'c', 'd', 'A', 'b', 'e'}   
 
 def cmp_item(item: Item, lhs: str, rhs: list[str], lookahead: set = set(), pos: int = 0) -> bool:
     return (
@@ -94,40 +119,26 @@ def parse_item(item: str) -> Item:
 
     return Item(Rule(lhs, rhs), lookahead, pos)
     
-def config_Grammar(grammar: str, map = {}):
-    with tempfile.NamedTemporaryFile(mode='w+', delete=True) as temp_file:
-        temp_file.write(str)
-        temp_file.seek(0)
-
-class TestItem(unittest.TestCase):
+# class TestItem(unittest.TestCase):
     
-    # paste the entire grammar as string and parse it with grammar 
-    # paste items in 
+    # def test_closure(self):
 
-    def test_closure(self):
+        # res = parse_item("x ::= X X").closure()
+        # assert cmp_item(res[0], parse_item("X ::= . a X , a b"))
+        # assert cmp_item(res[0], parse_item("X ::= . b , a b"))
 
-        mock_file = mock_open(read_data=""
-        "S ::= X X"
-        "X ::= a X"
-        "| b")
-        grammer = Grammar(mock_file)
-
-        res = parse_item("x ::= X X").closure()
-        assert cmp_item(res[0], parse_item("X ::= . a X , a b"))
-        assert cmp_item(res[0], parse_item("X ::= . b , a b"))
-
-        Grammar._rules = {}
-        Grammar._rules["<declaration-specifier>"] = [
-            ["<storage-class-specifier>"],
-            ["<type-specifier>"],
-            ["<type-qualifier>"]
-        ]
-        Grammar._rules["<declarator>"] = [
-            ["{<pointer>}?", "<direct-declarator>"]
-        ]
-        item = Item(Rule("<parameter-declaration>", ["{<declaration-specifier>}*", "<declarator>"]))
-        for i in item.closure():
-            print(i)
+        # Grammar._rules = {}
+        # Grammar._rules["<declaration-specifier>"] = [
+        #     ["<storage-class-specifier>"],
+        #     ["<type-specifier>"],
+        #     ["<type-qualifier>"]
+        # ]
+        # Grammar._rules["<declarator>"] = [
+        #     ["{<pointer>}?", "<direct-declarator>"]
+        # ]
+        # item = Item(Rule("<parameter-declaration>", ["{<declaration-specifier>}*", "<declarator>"]))
+        # for i in item.closure():
+        #     print(i)
 
  
         # assert cmp_item(res[0], "{<declaration-specifier>}*", )
@@ -143,23 +154,53 @@ class TestItem(unittest.TestCase):
         # assert res[1].pos == 0
         # assert res[1].lookahead == {'a', 'b'}
 
-class TestCore(unittest.TestCase):
-    def test_add(self):
-        pass
-    def test__init__(self):
-        pass
+c = TestGrammar()
+c.test_parsing_basic()
+c.test_parsing_spaces()
+c.test_parsing_tags()
+c.test_find_first_basic()
+c.test_find_first_tags()
+c.test_remove_tags()
 
-class TestState(unittest.TestCase):
-    def test__init__(self):
-        pass
-    def test_is_reduction_ambiguous(self):
-        pass
-    def test_add_reduction(self):
-        pass
-    def test_merge_state(self):
-        pass
-    def test_connect_states(self):
-        pass
+# class TestCore(unittest.TestCase):
+#     def test_add(self):
+#         pass
+#     def test__init__(self):
+#         pass
 
-c = TestItem()
-c.test_closure()
+# class TestState(unittest.TestCase):
+#     def test__init__(self):
+#         pass
+#     def test_is_reduction_ambiguous(self):
+#         pass
+#     def test_add_reduction(self):
+#         pass
+#     def test_merge_state(self):
+#         pass
+#     def test_connect_states(self):
+#         pass
+
+# def test_remove_tags(self):
+#     # only tags
+#     with pytest.raises(RuntimeError):
+#         Grammar.remove_tags("*****")
+#     with pytest.raises(RuntimeError):
+#         Grammar.remove_tags("++*++")
+
+#     # values <= 2
+#     assert Grammar.remove_tags(" ") == " "
+#     assert Grammar.remove_tags("") == ""
+#     assert Grammar.remove_tags("*") == "*"
+#     assert Grammar.remove_tags("+=") == "+="
+#     assert Grammar.remove_tags("+=*") == "="
+    
+#     assert Grammar.remove_tags("<>") == "<>"
+#     assert Grammar.remove_tags("<*>") == "<*>"
+#     assert Grammar.remove_tags("<foo>") == "<foo>"
+#     assert Grammar.remove_tags("<foo>*") == "<foo>"
+
+#     assert Grammar.remove_tags("{<external-declaration>}*") == "<external-declaration>"
+#     assert Grammar.remove_tags("{<expression>}?") == "<expression>"
+
+#     assert Grammar.remove_tags("{<foo>*}") == "<foo>"
+#     assert Grammar.remove_tags("{ <foo>* }") == " <foo>* "

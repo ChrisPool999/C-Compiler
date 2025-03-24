@@ -10,17 +10,13 @@ class Grammar(metaclass=Singleton):
     OPTIONAL_TAGS = ['*', '?']
     REPETITION_TAGS = ['*', '+']
 
-    def __init__(self, filename: str) -> None:
+    def parse_file(self, filename: str) -> None:
         with open(filename, 'r') as file: 
             input = []
-
-            for line_num, line in enumerate(file, start=1):   
-                if line_num == 1:
-                    Grammar.START_SYMBOL = line.split()[0]
-                
+            for line_num, line in enumerate(file, start=1):               
                 input.append(line)
 
-            self._parse_grammar(input)
+            self._parse_from_string(input)
 
     @classmethod
     def _parse_grammar_line(cls, input: list[str], lhs = None) -> Rule:
@@ -34,7 +30,9 @@ class Grammar(metaclass=Singleton):
             raise BNFError(BNFError.MSG_EMPTY_BNF)
 
     @classmethod 
-    def _parse_grammar(cls, BNF: list[str]) -> None:
+    def _parse_from_string(cls, BNF: list[str]) -> None:
+            cls.START_SYMBOL = BNF[0].split()[0]
+
             lhs = None
             for line in BNF:        
                 substrs = line.split()
@@ -42,7 +40,6 @@ class Grammar(metaclass=Singleton):
                     continue
 
                 rule = cls._parse_grammar_line(substrs, lhs)
-
                 if lhs != rule.lhs:
                     lhs = rule.lhs
                 
