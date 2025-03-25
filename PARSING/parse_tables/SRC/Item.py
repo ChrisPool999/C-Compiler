@@ -14,6 +14,9 @@ class Item:
 
     @staticmethod
     def get_rule_with_pos(item: Item) -> str:
+        # if not isinstance(item, Item):
+            # raise ValueError("arg should be of type Item")
+
         expansion = " "
         for i in range(len(item.rhs)):
             if i == item.pos:

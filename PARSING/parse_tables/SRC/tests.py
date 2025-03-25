@@ -288,7 +288,7 @@ class TestState(unittest.TestCase):
                                                | b""")
         core = parse_item("S' ::=   . S , $")
         state = State(core)
-        state._get_edges()
+        State.make_state_map(state)
 
         assert "S" in state.edges
         assert "X" in state.edges
@@ -296,12 +296,13 @@ class TestState(unittest.TestCase):
         assert "b" in state.edges
         assert len(state.edges) == 4
 
-    # check state mapping
-    # check branch state creation
-    # check any grammer ambiguity is found 
-    # check matching states are merged
-    # check for cycles
+#     # check state mapping
+#     # check branch state creation
+#     # check any grammer ambiguity is found 
+#     # check matching states are merged
+#     # check for cycles
+#     # check for States with multiple cores
 
-c = TestState()
-c.test_init_state()
-c.test_state_edges()
+# c = TestState()
+# c.test_init_state()
+# c.test_state_edges()

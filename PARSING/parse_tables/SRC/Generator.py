@@ -2,6 +2,7 @@ from __future__ import annotations
 from Grammar import Grammar, Rule
 from Item import Item
 from Singleton import Singleton
+from collections import deque 
 
 class Core:
     def __init__(self, items: Item | list[Item]):
@@ -20,6 +21,7 @@ class Core:
 
     def __hash__(self) -> str:
         string = hash(tuple(Item.get_rule_with_pos(item) for item in self._items))
+
         return hash(string)        
 
     def __eq__(self, other: Core) -> bool:
@@ -82,12 +84,33 @@ class State:
         for item in self.core.items:
             self._items += item.closure()           
 
-    def is_reduction_ambiguous(self, new_lookahead: set[str]) -> bool:
-        for item, old_lookahead in self.reductions.items():
-            if len(new_lookahead | old_lookahead) != 0:
-                return False
+    @classmethod
+    def make_state_map(cls, root: State) -> dict[Core, State]:
+        dq = deque([root])
 
-        return True
+        while dq:
+            state = dq[0]
+
+            for item in (state.core._items + state.items):
+                if item.pos >= len(item.rhs):
+                    state.add_reduction(item)          
+            
+            edges = state._get_edges()
+
+            for edge, node in edges.items():
+                core = Core(node)
+
+                if hash(core) in State.state_map:
+                    State.state_map[hash(core)]._merge_state(core)
+                    continue
+                
+                new_state = State(core)
+                State.state_map[hash(core)] = new_state
+                dq.append(new_state)
+
+                state.edges[edge] = new_state
+
+            dq.popleft()
 
     def add_reduction(self, item) -> None:
         if item in self.reductions:
@@ -98,24 +121,29 @@ class State:
         if self.is_reduction_ambiguous(item.lookahead):
             raise RuntimeError("reduction/reduction ambiguity. Multiple reductions with same lookahead")
 
+    def is_reduction_ambiguous(self, new_lookahead: set[str]) -> bool:
+        for item, old_lookahead in self.reductions.items():
+            if len(new_lookahead | old_lookahead) != 0:
+                return False
+
+        return True
+
     def _get_edges(self) -> dict[str, Core]:
         edges = {}
 
         for item in (self.core._items + self._items):
-            if item.pos >= len(item.rhs):
-                self.add_reduction(item)
-            else:            
+                if item.pos >= len(item.rhs):
+                    continue
+
                 symbol = item.rhs[item.pos]
-                new_item = Item(item.rule, item.lookahead, item.pos + 1)
+                next_item = Item(item.rule, item.lookahead, item.pos + 1)
 
-                if symbol not in edges:
-                    edges[symbol] = Core(new_item)
-
+                if symbol in edges:
+                    edges[symbol].append(next_item)
                 else:
-                    core = edges[symbol]
-                    core.add(new_item)
+                    edges[symbol] = [next_item]
 
-        self._connect_states(edges) 
+        return edges
 
     def _merge_state(self, core: Core) -> None:
         if len(self.core.items) != len(core.items):
@@ -123,16 +151,6 @@ class State:
 
         for i in range(len(self.core.items)):
             self.core.items[i].lookahead |= core.items[i].lookahead
-
-    def _connect_states(self, edges: dict[str, Core]):
-        for symbol, core in edges.items():
-            if hash(core) in State.state_map:
-                State.state_map[hash(core)]._merge_state(core)
-                continue
-
-            state = State(core)
-            self.edges[symbol] = state
-            state._get_edges() 
 
 class Generator(metaclass=Singleton):
 
@@ -159,9 +177,8 @@ class Generator(metaclass=Singleton):
 
         start = Generator._get_augment_start()
         Grammar._rules[start.lhs] = [start.rhs] 
-        start_state = State(start)
-        start_state._get_edges()
 
+        State.make_state_map(State(start))
         Generator.print_states()
 
 if __name__ == "__main__":
