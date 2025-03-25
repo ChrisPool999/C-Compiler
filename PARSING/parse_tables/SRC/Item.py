@@ -41,7 +41,15 @@ class Item:
         self.rule = rule
         self.lookahead = lookahead 
         self.pos = pos
-    
+
+    def __eq__(self, item: Item) -> bool:
+        return (
+        self.lhs == item.lhs and
+        self.rhs == item.rhs and
+        self.lookahead == item.lookahead and
+        self.pos == item.pos
+        )
+
     def __hash__(self):
         return hash(self.get_rule_with_pos(self)) 
 

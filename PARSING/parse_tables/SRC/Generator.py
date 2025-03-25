@@ -23,7 +23,14 @@ class Core:
         return hash(string)        
 
     def __eq__(self, other: Core) -> bool:
-        return len(self.items) < len(other.items)
+        if len(self.items) != len(other.items):
+            return False
+
+        for i in range(len(self._items)):
+            if self._items[i] != other.items[i]:
+                return False
+
+        return True
 
     def add(self, item: Item) -> None:
         if not self._init:
@@ -91,7 +98,7 @@ class State:
         if self.is_reduction_ambiguous(item.lookahead):
             raise RuntimeError("reduction/reduction ambiguity. Multiple reductions with same lookahead")
 
-    def _create_edges(self) -> dict[str, Core]:
+    def _get_edges(self) -> dict[str, Core]:
         edges = {}
 
         for item in (self.core._items + self._items):
@@ -125,7 +132,7 @@ class State:
 
             state = State(core)
             self.edges[symbol] = state
-            state._create_edges() 
+            state._get_edges() 
 
 class Generator(metaclass=Singleton):
 
@@ -153,12 +160,12 @@ class Generator(metaclass=Singleton):
         start = Generator._get_augment_start()
         Grammar._rules[start.lhs] = [start.rhs] 
         start_state = State(start)
-        start_state._create_edges()
+        start_state._get_edges()
 
         Generator.print_states()
 
 if __name__ == "__main__":
-    filename = "./PARSING/parse_tables/BNF1.txt"
+    filename = "./PARSING/parse_tables/BNF3.txt"
     Generator.generate(filename)
 
 # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-listc

@@ -114,37 +114,30 @@ def parse_item(item: str) -> Item:
 
     return Item(Rule(lhs, rhs), lookahead, pos)
     
-# helper for testing item
-def cmp_item(item: Item, item2: Item) -> bool:
-    return (
-        item.lhs == item2.lhs and
-        item.rhs == item2.rhs and
-        item.lookahead == item2.lookahead and
-        item.pos == item2.pos
-    )
-
-# helper for testing item
-def cmp_item_list(items: list[Item], values: list[str]) -> bool:
-    if len(items) != len(values):
-        raise ValueError("cmp_item_list is comparing item lists of two different sizes")
-
-    for i in range(len(items)):
-        if not cmp_item(items[i], parse_item(values[i])):
-            return False
-
-    return True   
-
 class TestItem(unittest.TestCase):
     
+    def test_item_eq_method(self):
+        item = parse_item("X ::= . a X , a b")
+        item2 = parse_item("X ::= . b , a b")
+        assert item != item2 
+
+        item = parse_item("X ::= . a X , a b")
+        item2 = parse_item("X ::= . a X ,")
+        assert item != item2
+
+        item = parse_item("X ::= . a X , a b")
+        item2 = parse_item("X ::= . a X , a b")
+        assert item == item2  
+
     def test_closure_basic(self):
         grammar = TestGrammar.make_new_grammar("""X ::= a X 
                                                | b""")
         item = parse_item("x ::= . X X, $")
         closure_items = item.closure()
 
-        assert cmp_item_list(closure_items, [
-            "X ::= . a X , a b", 
-            "X ::= . b , a b"])
+        assert closure_items[0] == parse_item("X ::= . a X , a b")
+        assert closure_items[1] == parse_item("X ::= . b , a b")
+        assert len(closure_items) == 2
 
     def test_closure_result_loop(self):
         grammar = TestGrammar.make_new_grammar("""A ::= B
@@ -152,132 +145,163 @@ class TestItem(unittest.TestCase):
         item = parse_item("X ::= . A B, $")
         closure_items = item.closure()
 
-        assert cmp_item_list(closure_items, [
-            "A ::= B , c", 
-            "B ::= c , c"])
+        assert closure_items[0] == parse_item("A ::= B , c")
+        assert closure_items[1] == parse_item("B ::= c , c")
+        assert len(closure_items) == 2
+
+    def test_closure_cycles(self):
+        grammar = TestGrammar.make_new_grammar("""A ::= a
+                                               a ::= A""")
+        item = parse_item("A ::= . a , $")
+        closure_items = item.closure()
+
+        assert closure_items[0] == parse_item("a ::=   . A , $")
+        assert closure_items[1] == parse_item("A ::=   . a , $")
+        assert len(closure_items) == 2
+
+    def test_closure_terminal(self):
+        # basic
+        grammar = TestGrammar.make_new_grammar("""A ::= B
+                                               B ::= c""")
+        item = parse_item("X ::= . a B, $")
+        closure_items = item.closure()
+
+        assert closure_items == []
+
+        # test with tags
+        grammar = TestGrammar.make_new_grammar("""A ::= B
+                                               B ::= c""")
+        item = parse_item("X ::= . {a}* B, $")
+        closure_items = item.closure()
+
+        assert closure_items[0] == parse_item("{a}* ::=   . {a}* {a}* , $")
+        assert closure_items[1] == parse_item("{a}* ::=   . , $")
+        assert len(closure_items) == 2
 
     def test_closure_option_tag(self):
+        # basic
         grammar = TestGrammar.make_new_grammar("""B ::= b
                                                C ::= c""")
         item = parse_item("A ::= . {B}? C, $")
         closure_items = item.closure()
 
-        assert cmp_item_list(closure_items, [
-            "{B}? ::=   . , c ", 
-            "{B}? ::=   . b , c",
-            "C ::= c, $"])
+        assert closure_items[0] == parse_item( "{B}? ::=   . , c ")
+        assert closure_items[1] == parse_item("{B}? ::=   . b , c")
+        assert closure_items[2] == parse_item("C ::= c, $")
+        assert len(closure_items) == 3
 
-    def test_closure_repetitive_tag(self):
-        grammar = TestGrammar.make_new_grammar("""B ::= b
-                                               C ::= c""")
-        item = parse_item("A ::= . {B}* C, $")
-        closure_items = item.closure()
-
-        assert cmp_item_list(closure_items, [
-            "{B}* ::=   . {B}* {B}* , b c",
-            "{B}* ::=   . , b c",
-            "{B}* ::=   . b , b c",
-            "C ::=   . c , $"])
-
-    def test_closure_plus_tag(self):
-        grammar = TestGrammar.make_new_grammar("""B ::= b
-                                               C ::= c""")
-        item = parse_item("A ::= . {B}+ C, $")
-        closure_items = item.closure()
-
-        assert cmp_item_list(closure_items, [
-            "{B}+ ::=   . {B}+ {B}* , c b",
-            "{B}+ ::=   . b , c b"])
-
-    def test_closure_final_symbol(self):
-        grammar = TestGrammar.make_new_grammar("""B ::= b
-                                               C ::= c""")
-        item = parse_item("A ::= . {B}? C, $")
-        closure_items = item.closure()
-
-        assert cmp_item_list(closure_items, [
-            "{B}? ::=   . , c ", 
-            "{B}? ::=   . b , c",
-            "C ::= c, $"])
-        
+        # final symbol option tag
         grammar = TestGrammar.make_new_grammar("""C ::= c""")
         item = parse_item("A ::= . {C}? , $")
         closure_items = item.closure()
 
-        assert cmp_item_list(closure_items, [
-            "{C}? ::=   . , $",
-            "{C}? ::=   . c , $"]) 
+        assert closure_items[0] == parse_item("{C}? ::=   . , $")
+        assert closure_items[1] == parse_item("{C}? ::=   . c , $")
+        assert len(closure_items) == 2
 
-        grammar = TestGrammar.make_new_grammar("""C ::= c""")
-        item = parse_item("A ::= . {C}* , $")
-        closure_items = item.closure()
-
-        assert cmp_item_list(closure_items, [
-            "{C}* ::=   . {C}* {C}* , $ c", 
-            "{C}* ::=   . , $ c",
-            "{C}* ::=   . c , $ c"])
-
-        grammar = TestGrammar.make_new_grammar("""B ::= {D}? {c}?
-                                               D ::= c b""")
-        item = parse_item("A ::= . B , $")
-        closure_items = item.closure()
-
-        assert cmp_item_list(closure_items, [
-            "B ::=   . {D}? {c}? , $",
-            "{D}? ::=   . , $ c",
-            "{D}? ::=   . c b , $ c",
-            "{c}? ::=   . , $"])
-
+        # double optional
         grammar = TestGrammar.make_new_grammar("""B ::= {D}? {C}?
                                                D ::= c b
                                                C ::= c""")
         item = parse_item("A ::= . B , $")
         closure_items = item.closure()
 
-        assert cmp_item_list(closure_items, [
-            "B ::=   . {D}? {C}? , $",
-            "{D}? ::=   . , $ c",
-            "{D}? ::=   . c b , $ c", 
-            "{C}? ::=   . , $",
-            "{C}? ::=   . c , $"]) 
+        assert closure_items[0] == parse_item("B ::=   . {D}? {C}? , $")
+        assert closure_items[1] == parse_item("{D}? ::=   . , $ c")
+        assert closure_items[2] == parse_item("{D}? ::=   . c b , $ c")
+        assert closure_items[3] == parse_item("{C}? ::=   . , $")
+        assert closure_items[4] == parse_item("{C}? ::=   . c , $")
+        assert len(closure_items) == 5
 
-        grammar = TestGrammar.make_new_grammar("""B ::= {b}*
-                                               | a
+    def test_closure_repetitive_tag(self):
+        # basic
+        grammar = TestGrammar.make_new_grammar("""B ::= b
                                                C ::= c""")
-        item = parse_item("A ::= . B C, $")
+        item = parse_item("A ::= . {B}* C, $")
         closure_items = item.closure()
 
-        assert cmp_item_list(closure_items, [
-            "B ::=   . {b}* , c",
-            "B ::=   . a , c",
-            "{b}* ::=   . {b}* {b}* , c",
-            "{b}* ::=   . , c"])
-        
-#TODO ISSUES NEEDING FIXING
-"""
-- make sure if you have matching sets, you combine their lookahead, eg x = *b b
-    unsure about this one, wouldnt they be different items? check...
-"""
+        assert closure_items[0] == parse_item("{B}* ::=   . {B}* {B}* , b c")
+        assert closure_items[1] == parse_item("{B}* ::=   . , b c")
+        assert closure_items[2] == parse_item("{B}* ::=   . b , b c")
+        assert closure_items[3] == parse_item("C ::=   . c , $")
+        assert len(closure_items) == 4
 
+        # final symbol repetition tag
+        grammar = TestGrammar.make_new_grammar("""C ::= c""")
+        item = parse_item("A ::= . {C}* , $")
+        closure_items = item.closure()
 
+        assert closure_items[0] == parse_item("{C}* ::=   . {C}* {C}* , $ c")
+        assert closure_items[1] == parse_item("{C}* ::=   . , $ c")
+        assert closure_items[2] == parse_item("{C}* ::=   . c , $ c")
+        assert len(closure_items) == 3
 
+    def test_closure_plus_tag(self):
+        # basic
+        grammar = TestGrammar.make_new_grammar("""B ::= b
+                                               C ::= c""")
+        item = parse_item("A ::= . {B}+ C, $")
+        closure_items = item.closure()
 
-# closure = put all rules where symbol is on LHS
-# if symbol is optional, need to do next symbol too
-# also do closure, for all item sets generated
+        assert closure_items[0] == parse_item("{B}+ ::=   . {B}+ {B}* , c b")
+        assert closure_items[1] == parse_item("{B}+ ::=   . b , c b")
+        assert len(closure_items) == 2
 
-# LOOKAHEAD (find follow()):
-# if symbol is last, pass current lookahead
-# find next terminal that will occur after the symbol
+        # final symbol plus tag
+        grammar = TestGrammar.make_new_grammar("""B ::= b""")
+        item = parse_item("A ::= . {B}+ , $")
+        closure_items = item.closure()
 
-# class TestState(unittest.TestCase):
-#     def test__init__(self):
-#         pass
-#     def test_is_reduction_ambiguous(self):
-#         pass
-#     def test_add_reduction(self):
-#         pass
-#     def test_merge_state(self):
-#         pass
-#     def test_connect_states(self):
-#         pass
+        assert closure_items[0] == parse_item("{B}+ ::= . {B}+ {B}* , $ b")
+        assert closure_items[1] == parse_item("{B}+ ::=   . b , $ b")
+        assert len(closure_items) == 2
+
+class TestState(unittest.TestCase):
+
+    @classmethod
+    def reset_states(self):
+        for c, other_states in State.state_map.items():
+            other_states.core = None
+            other_states._items = []
+            other_states.edges = {}
+            other_states.reductions = {}
+
+        State.state_map = {}
+
+    def test_init_state(self):
+        grammar = TestGrammar.make_new_grammar("""S ::= X X
+                                               X ::= a X
+                                               | b""")
+        core = parse_item("S' ::=   . S , $")
+        state = State(core)
+
+        assert state.core == Core(parse_item("S' ::=   . S , $"))
+        assert state.items[0] == parse_item("S ::=   . X X , $")
+        assert state.items[1] == parse_item("X ::=   . a X , b a")
+        assert state.items[2] == parse_item("X ::=   . b , b a")
+        assert len(state.items) == 3
+        self.reset_states()
+
+    def test_state_edges(self):
+        grammar = TestGrammar.make_new_grammar("""S ::= X X
+                                               X ::= a X
+                                               | b""")
+        core = parse_item("S' ::=   . S , $")
+        state = State(core)
+        state._get_edges()
+
+        assert "S" in state.edges
+        assert "X" in state.edges
+        assert "a" in state.edges
+        assert "b" in state.edges
+        assert len(state.edges) == 4
+
+    # check state mapping
+    # check branch state creation
+    # check any grammer ambiguity is found 
+    # check matching states are merged
+    # check for cycles
+
+c = TestState()
+c.test_init_state()
+c.test_state_edges()
