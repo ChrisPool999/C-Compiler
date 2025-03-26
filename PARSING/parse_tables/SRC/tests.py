@@ -181,8 +181,8 @@ class TestItem(unittest.TestCase):
         item = parse_item("X ::= . {a}* B, $")
         closure_items = item.closure()
 
-        assert closure_items[0] == parse_item("{a}* ::=   . {a}* {a}* , $")
-        assert closure_items[1] == parse_item("{a}* ::=   . , $")
+        assert closure_items[0] == parse_item("{a}* ::=   . {a}* {a}* , c a")
+        assert closure_items[1] == parse_item("{a}* ::=   . , c")
         assert len(closure_items) == 2
 
     def test_closure_option_tag(self):

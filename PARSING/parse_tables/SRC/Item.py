@@ -103,7 +103,7 @@ class Item:
     def is_closure_invalid(self, seen: set):
         return (len(self.rhs) == 0 
             or self.pos >= len(self.rhs) 
-            or Grammar.is_terminal(self.rhs[self.pos])
+            or (Grammar.is_terminal(self.rhs[self.pos]) and Grammar.is_optional(self.rhs[self.pos]) and Grammar.is_repetitive(self.rhs[self.pos]) )
             or self.rhs[self.pos] in seen
         )
 
@@ -128,6 +128,9 @@ class Item:
         new_items = self._create_tag_sets(symbol, lookahead)
 
         lhs = Grammar.remove_tags(symbol)
+        if lhs not in Grammar._rules:
+            return new_items
+
         for rhs in Grammar._rules[lhs]:
             new_items.append(Item(Rule(symbol, rhs), lookahead))
 
@@ -144,20 +147,10 @@ class Item:
             Return: list[Item] Returns a list of item sets that are produced from closure
         """    
         if not seen: seen = set()
-        
-        if self.pos < len(self.rhs) and Grammar.is_terminal(self.rhs[self.pos]) and Grammar.is_optional(self.rhs[self.pos]):                
-            if self.rhs[self.pos] in seen:
-                return []
-
-            new = self._create_tag_sets(self.rhs[self.pos], self.lookahead)
-            seen.add(self.rhs[self.pos])
-            return new
-
         if self.is_closure_invalid(seen): 
             return []
         
         seen.add(self.rhs[self.pos])
-
         new_items = self._get_closure_items()
 
         if self.pos + 1 < len(self.rhs) and Grammar.is_optional(self.rhs[self.pos]):
