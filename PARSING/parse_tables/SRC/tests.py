@@ -159,6 +159,13 @@ class TestItem(unittest.TestCase):
         assert closure_items[1] == parse_item("A ::=   . a , $")
         assert len(closure_items) == 2
 
+        grammar = TestGrammar.make_new_grammar("""X ::= a X""")
+        item = parse_item("X ::= a . X , $")
+        closure_items = item.closure()
+
+        assert closure_items[0] == parse_item("X ::= . a X , $")
+        assert len(closure_items) == 1
+
     def test_closure_terminal(self):
         # basic
         grammar = TestGrammar.make_new_grammar("""A ::= B
@@ -295,14 +302,29 @@ class TestState(unittest.TestCase):
         assert "a" in state.edges
         assert "b" in state.edges
         assert len(state.edges) == 4
+        self.reset_states()
 
-#     # check state mapping
-#     # check branch state creation
-#     # check any grammer ambiguity is found 
+    def test_connecting_state(self):
+        grammar = TestGrammar.make_new_grammar("""S ::= X X
+                                               X ::= a X
+                                               | b""")
+        core = parse_item("S' ::=   . S , $")
+        state = State(core)
+        State.make_state_map(state)
+
+        edge = state.edges["X"]
+        assert edge.core == Core(parse_item("S ::= X  . X , $"))
+        assert parse_item("X ::=   . a X , $") in edge.items
+        assert parse_item("X ::=   . b , $") in edge.items
+        assert len(edge.items) == 2
+        self.reset_states()
+
 #     # check matching states are merged
+
+#     # check grammar reduction rules are valid
+#     # check any grammer ambiguity is found 
 #     # check for cycles
 #     # check for States with multiple cores
 
-# c = TestState()
-# c.test_init_state()
-# c.test_state_edges()
+c = TestState()
+c.test_connecting_state()
