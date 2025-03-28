@@ -65,7 +65,6 @@ class Item:
 
     def _find_follow(self, _offset: int = 0) -> set[str]:
         """ 
-
             Finds the follow() of a symbol\n
             The follow() is the set of terminals that can appear after a symbol within a rule\n
             Includes any cases where the symbol may be optional, repetitive, or the last symbol in a rule\n
@@ -79,11 +78,11 @@ class Item:
         """        
         pos = self.pos + _offset
         if pos >= len(self.rhs): 
-            raise IndexError(BNFError.MSG_item_OOB(self.lhs, self.rhs, pos))
+            return set()
 
         terminals = set()
 
-        # if the current symbol can repeat, the repeat would follow the current
+        # if the current symbol can repeat, the next symbol could be a repetition
         curr_symbol = self.rhs[pos]
         if Grammar.is_repetitive(curr_symbol):
             terminals |= Grammar.find_first(curr_symbol)
@@ -103,9 +102,15 @@ class Item:
     def is_closure_invalid(self, seen: set):
         return (len(self.rhs) == 0 
             or self.pos >= len(self.rhs) 
-            or (Grammar.is_terminal(self.rhs[self.pos]) and Grammar.is_optional(self.rhs[self.pos]) and Grammar.is_repetitive(self.rhs[self.pos]) )
+            or (Grammar.is_terminal(self.rhs[self.pos]) and not Grammar.is_optional(self.rhs[self.pos]) and not Grammar.is_repetitive(self.rhs[self.pos]))
             or self.rhs[self.pos] in seen
         )
+
+#   x = . A* B , $                   LOOKAHEAD = a, b (first() of itself + next symbol, option chain)
+
+# REPETITIVE  --  A = . A* A* , b    LOOKAHEAD = a (first() of itself)
+
+# OPTIONAL    --  A = . , b          LOOKAHEAD = b (next symbol, (including option chain))
 
     def _create_tag_sets(self, symbol: str, lookahead: set[str]) -> list[Item]:
         new_items = []
@@ -149,7 +154,7 @@ class Item:
         if not seen: seen = set()
         if self.is_closure_invalid(seen): 
             return []
-        
+
         seen.add(self.rhs[self.pos])
         new_items = self._get_closure_items()
 

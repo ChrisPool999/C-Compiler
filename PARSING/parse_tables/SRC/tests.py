@@ -326,5 +326,8 @@ class TestState(unittest.TestCase):
 #     # check for cycles
 #     # check for States with multiple cores
 
-c = TestState()
-c.test_connecting_state()
+# c = TestState()
+# c.test_connecting_state()
+
+item = parse_item("A ::= . {A}? B , $")
+print(item._find_follow())
