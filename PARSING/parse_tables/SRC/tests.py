@@ -181,9 +181,10 @@ class TestItem(unittest.TestCase):
         item = parse_item("X ::= . {a}* B, $")
         closure_items = item.closure()
 
-        assert closure_items[0] == parse_item("{a}* ::=   . {a}* {a}* , c a")
+        assert closure_items[0] == parse_item("{a}* ::=   . {a}* {a}* , a c")
         assert closure_items[1] == parse_item("{a}* ::=   . , c")
-        assert len(closure_items) == 2
+        assert closure_items[2] == parse_item("B ::=   . c , $")
+        assert len(closure_items) == 3
 
     def test_closure_option_tag(self):
         # basic
@@ -192,9 +193,9 @@ class TestItem(unittest.TestCase):
         item = parse_item("A ::= . {B}? C, $")
         closure_items = item.closure()
 
-        assert closure_items[0] == parse_item( "{B}? ::=   . , c ")
+        assert closure_items[0] == parse_item( "{B}? ::=   . , c")
         assert closure_items[1] == parse_item("{B}? ::=   . b , c")
-        assert closure_items[2] == parse_item("C ::= c, $")
+        assert closure_items[2] == parse_item("C ::= . c, $")
         assert len(closure_items) == 3
 
         # final symbol option tag
@@ -228,7 +229,7 @@ class TestItem(unittest.TestCase):
         closure_items = item.closure()
 
         assert closure_items[0] == parse_item("{B}* ::=   . {B}* {B}* , b c")
-        assert closure_items[1] == parse_item("{B}* ::=   . , b c")
+        assert closure_items[1] == parse_item("{B}* ::=   . , c")
         assert closure_items[2] == parse_item("{B}* ::=   . b , b c")
         assert closure_items[3] == parse_item("C ::=   . c , $")
         assert len(closure_items) == 4
@@ -239,7 +240,7 @@ class TestItem(unittest.TestCase):
         closure_items = item.closure()
 
         assert closure_items[0] == parse_item("{C}* ::=   . {C}* {C}* , $ c")
-        assert closure_items[1] == parse_item("{C}* ::=   . , $ c")
+        assert closure_items[1] == parse_item("{C}* ::=   . , $")
         assert closure_items[2] == parse_item("{C}* ::=   . c , $ c")
         assert len(closure_items) == 3
 
@@ -328,6 +329,3 @@ class TestState(unittest.TestCase):
 
 # c = TestState()
 # c.test_connecting_state()
-
-item = parse_item("A ::= . {A}? B , $")
-print(item._find_follow())

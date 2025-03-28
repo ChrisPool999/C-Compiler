@@ -1,6 +1,7 @@
 from __future__ import annotations
 from Grammar import Grammar, Rule
 from BNFError import BNFError
+import copy
 
 class Item:
 
@@ -63,7 +64,10 @@ class Item:
 
         return (self.get_rule_with_pos(self) + ", " + lookahead_list)
 
-    def _find_follow(self, _offset: int = 0) -> set[str]:
+    def _find_follow_optional():
+        pass  
+
+    def _find_follow(self, offset: int = 0) -> set[str]:
         """ 
             Finds the follow() of a symbol\n
             The follow() is the set of terminals that can appear after a symbol within a rule\n
@@ -76,14 +80,14 @@ class Item:
             Returns:
             set[str]: returns a set of terminals symbols that could possibly follow a symbol in a rule
         """        
-        pos = self.pos + _offset
+        pos = self.pos + offset
         if pos >= len(self.rhs): 
             return set()
 
         terminals = set()
 
         # if the current symbol can repeat, the next symbol could be a repetition
-        curr_symbol = self.rhs[pos]
+        curr_symbol = self.rhs[self.pos]
         if Grammar.is_repetitive(curr_symbol):
             terminals |= Grammar.find_first(curr_symbol)
 
@@ -94,7 +98,7 @@ class Item:
 
         next_symbol = self.rhs[pos + 1]
         if Grammar.is_optional(next_symbol):
-            terminals |= self._find_follow(_offset + 1)
+            terminals |= self._find_follow(offset + 1)
 
         terminals |= Grammar.find_first(next_symbol)
         return terminals
@@ -112,30 +116,36 @@ class Item:
 
 # OPTIONAL    --  A = . , b          LOOKAHEAD = b (next symbol, (including option chain))
 
-    def _create_tag_sets(self, symbol: str, lookahead: set[str]) -> list[Item]:
+    def _create_tag_sets(self, symbol: str) -> list[Item]:
         new_items = []
 
         # symbol needs to be able to repeat any number of times
         if Grammar.is_repetitive(symbol):
             repetition_symbol = "{" + Grammar.remove_tags(symbol) + "}*"
-            new_items.append(Item(Rule(symbol, [symbol, repetition_symbol]), lookahead))
+            lookahead = self._find_follow()
+            item = Item(Rule(symbol, [symbol, repetition_symbol]), lookahead)
+            new_items.append(item)
         
         # empty rhs means we can create the LHS with no input needed
         if Grammar.is_optional(symbol):
+            temp = copy.deepcopy(self)
+            temp.rhs[temp.pos] = Grammar.remove_tags(temp.rhs[temp.pos])
+            lookahead = temp._find_follow()
+
             new_items.append(Item(Rule(symbol, []), lookahead))
 
         return new_items
 
     def _get_closure_items(self) -> list[Item]:
         symbol = self.rhs[self.pos]
-        lookahead = self._find_follow()
 
-        new_items = self._create_tag_sets(symbol, lookahead)
+        new_items = self._create_tag_sets(symbol)
 
         lhs = Grammar.remove_tags(symbol)
         if lhs not in Grammar._rules:
             return new_items
 
+        lookahead = self._find_follow()
         for rhs in Grammar._rules[lhs]:
             new_items.append(Item(Rule(symbol, rhs), lookahead))
 
@@ -152,6 +162,7 @@ class Item:
             Return: list[Item] Returns a list of item sets that are produced from closure
         """    
         if not seen: seen = set()
+
         if self.is_closure_invalid(seen): 
             return []
 
@@ -164,8 +175,13 @@ class Item:
         i = 0
         while i < len(new_items):
             item = new_items[i]
-            if item not in seen: 
-                new_items += item.closure(seen)
+            new_items += item.closure(seen)
             i += 1
 
         return new_items
+    
+# + -> repetition...            x = . a+ a* ,
+# ? -> optional                 x = .       , 
+# * -> repetition + optional    
+
+# 

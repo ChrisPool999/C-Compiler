@@ -1,0 +1,3 @@
+- closure
+  - what if we do a bunch of closure recursion
+    - lose the lookahead of a previous, but need it
