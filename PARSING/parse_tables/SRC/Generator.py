@@ -182,7 +182,7 @@ class Generator(metaclass=Singleton):
         Generator.print_states()
 
 if __name__ == "__main__":
-    filename = "./PARSING/parse_tables/BNF3.txt"
+    filename = "./PARSING/parse_tables/BNF1.txt"
     Generator.generate(filename)
 
 # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-listc

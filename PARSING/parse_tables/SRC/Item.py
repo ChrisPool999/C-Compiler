@@ -135,7 +135,6 @@ class Item:
 
     def _get_closure_items(self, seen) -> list[Item]:
         symbol = self.rhs[self.pos]
-
         items = self._create_tag_sets(symbol)
 
         lhs = Grammar.remove_tags(symbol)
@@ -148,7 +147,9 @@ class Item:
         for item in items:
             if self.hash_rule(item.lhs, item.rhs) not in seen:
                 new.append(item)
-                seen.add(self.hash_rule(item.lhs, item.rhs))
+                seen[self.hash_rule(item.lhs, item.rhs)] = item.lookahead
+            else:
+                seen[self.hash_rule(item.lhs, item.rhs)] |= item.lookahead
 
         return new
 
@@ -162,7 +163,7 @@ class Item:
 
             Return: list[Item] Returns a list of item sets that are produced from closure
         """    
-        if not seen: seen = set()
+        if not seen: seen = {}
 
         if self.is_closure_invalid(seen): 
             return []

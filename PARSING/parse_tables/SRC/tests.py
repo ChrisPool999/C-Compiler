@@ -182,7 +182,7 @@ class TestItem(unittest.TestCase):
         closure_items = item.closure()
 
         assert closure_items[0] == parse_item("{a}* ::=   . {a}* {a}* , a c")
-        assert closure_items[1] == parse_item("{a}* ::=   . , c")
+        assert closure_items[1] == parse_item("{a}* ::=   . , a c")
         assert closure_items[2] == parse_item("B ::=   . c , $")
         assert len(closure_items) == 3
 
@@ -229,7 +229,7 @@ class TestItem(unittest.TestCase):
         closure_items = item.closure()
 
         assert closure_items[0] == parse_item("{B}* ::=   . {B}* {B}* , b c")
-        assert closure_items[1] == parse_item("{B}* ::=   . , c")
+        assert closure_items[1] == parse_item("{B}* ::=   . , c b")
         assert closure_items[2] == parse_item("{B}* ::=   . b , b c")
         assert closure_items[3] == parse_item("C ::=   . c , $")
         assert len(closure_items) == 4
@@ -240,7 +240,7 @@ class TestItem(unittest.TestCase):
         closure_items = item.closure()
 
         assert closure_items[0] == parse_item("{C}* ::=   . {C}* {C}* , $ c")
-        assert closure_items[1] == parse_item("{C}* ::=   . , $")
+        assert closure_items[1] == parse_item("{C}* ::=   . , $ c")
         assert closure_items[2] == parse_item("{C}* ::=   . c , $ c")
         assert len(closure_items) == 3
 
