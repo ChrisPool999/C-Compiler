@@ -54,8 +54,15 @@ class Item:
         self.pos == item.pos
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.get_rule_with_pos(self)) 
+
+    def hash_rule(self, lhs: str, rhs: list[str]) -> int:
+        string = lhs + " ::= "
+        for symbol in rhs:
+            string += symbol + " "
+
+        return hash(string)
 
     def __repr__(self) -> str:
         lookahead_list = ""
@@ -63,9 +70,6 @@ class Item:
             lookahead_list += terminal + " "
 
         return (self.get_rule_with_pos(self) + ", " + lookahead_list)
-
-    def _find_follow_optional():
-        pass  
 
     def _find_follow(self, offset: int = 0) -> set[str]:
         """ 
@@ -107,14 +111,7 @@ class Item:
         return (len(self.rhs) == 0 
             or self.pos >= len(self.rhs) 
             or (Grammar.is_terminal(self.rhs[self.pos]) and not Grammar.is_optional(self.rhs[self.pos]) and not Grammar.is_repetitive(self.rhs[self.pos]))
-            or self.rhs[self.pos] in seen
         )
-
-#   x = . A* B , $                   LOOKAHEAD = a, b (first() of itself + next symbol, option chain)
-
-# REPETITIVE  --  A = . A* A* , b    LOOKAHEAD = a (first() of itself)
-
-# OPTIONAL    --  A = . , b          LOOKAHEAD = b (next symbol, (including option chain))
 
     def _create_tag_sets(self, symbol: str) -> list[Item]:
         new_items = []
@@ -128,28 +125,32 @@ class Item:
         
         # empty rhs means we can create the LHS with no input needed
         if Grammar.is_optional(symbol):
-            temp = copy.deepcopy(self)
-            temp.rhs[temp.pos] = Grammar.remove_tags(temp.rhs[temp.pos])
-            lookahead = temp._find_follow()
-
+            new_item = copy.deepcopy(self)
+            new_item.rhs[new_item.pos] = Grammar.remove_tags(new_item.rhs[new_item.pos])
+            lookahead = new_item._find_follow()
+            
             new_items.append(Item(Rule(symbol, []), lookahead))
 
         return new_items
 
-    def _get_closure_items(self) -> list[Item]:
+    def _get_closure_items(self, seen) -> list[Item]:
         symbol = self.rhs[self.pos]
 
-        new_items = self._create_tag_sets(symbol)
+        items = self._create_tag_sets(symbol)
 
         lhs = Grammar.remove_tags(symbol)
-        if lhs not in Grammar._rules:
-            return new_items
+        if lhs in Grammar._rules:
+            lookahead = self._find_follow()
+            for rhs in Grammar._rules[lhs]:
+                items.append(Item(Rule(symbol, rhs), lookahead))
 
-        lookahead = self._find_follow()
-        for rhs in Grammar._rules[lhs]:
-            new_items.append(Item(Rule(symbol, rhs), lookahead))
+        new = []
+        for item in items:
+            if self.hash_rule(item.lhs, item.rhs) not in seen:
+                new.append(item)
+                seen.add(self.hash_rule(item.lhs, item.rhs))
 
-        return new_items
+        return new
 
     #TODO optimize duplicate work with cache
     def closure(self, seen = None) -> list[Item]:
@@ -166,8 +167,7 @@ class Item:
         if self.is_closure_invalid(seen): 
             return []
 
-        seen.add(self.rhs[self.pos])
-        new_items = self._get_closure_items()
+        new_items = self._get_closure_items(seen)
 
         if self.pos + 1 < len(self.rhs) and Grammar.is_optional(self.rhs[self.pos]):
             new_items += Item(Rule(self.lhs, self.rhs), self.lookahead, self.pos + 1).closure(seen)
@@ -180,8 +180,3 @@ class Item:
 
         return new_items
     
-# + -> repetition...            x = . a+ a* ,
-# ? -> optional                 x = .       , 
-# * -> repetition + optional    
-
-# 
