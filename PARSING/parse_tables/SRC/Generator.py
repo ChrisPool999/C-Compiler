@@ -3,6 +3,7 @@ from Grammar import Grammar, Rule
 from Item import Item
 from Singleton import Singleton
 from collections import deque 
+from typing import Optional
 
 class Core:
     def __init__(self, items: Item | list[Item]):
@@ -48,22 +49,28 @@ class Core:
 
 class State:
     state_map: dict[Core, State] = {}
+    state_list = []
 
     @property
     def items(self):
         return self._items
 
+    def get_yellow_str_output(self, string: str) -> str:
+        return f"\033[93m{string}\033[0m"
+
+    def get_green_str_output(self, string: str) -> str:
+        return "\033[92m{string}\033[0m"
+
     def __repr__(self) -> str:
-        result = "Core:\n"
+        result = ""
         for item in self.core.items:
-            result += (str(item) + "\n")
+            result += self.get_yellow_str_output(str(item)) + "\n"
         
-        if not len(self._items):
-            return result
-        
-        result += "\nItems:\n"
         for item in self._items:
-            result += (str(item) + "\n")
+            if item.pos >= len(item.rhs):
+                result += self.get_green_str_output(str(item)) + "\n"
+            else:
+                result += (str(item) + "\n")
         
         return result
 
@@ -85,7 +92,7 @@ class State:
             self._items += item.closure()           
 
     @classmethod
-    def make_state_map(cls, root: State) -> dict[Core, State]:
+    def make_graph(cls, root: State) -> dict[Core, State]:
         dq = deque([root])
 
         while dq:
@@ -94,7 +101,9 @@ class State:
             for item in (state.core._items + state.items):
                 if item.pos >= len(item.rhs):
                     state.add_reduction(item)          
-            
+
+            State.state_list.append(state)
+
             edges = state._get_edges()
 
             for edge, node in edges.items():
@@ -102,6 +111,7 @@ class State:
 
                 if hash(core) in State.state_map:
                     State.state_map[hash(core)]._merge_state(core)
+                    state.edges[edge] = State.state_map[hash(core)]
                     continue
                 
                 new_state = State(core)
@@ -164,11 +174,50 @@ class Generator(metaclass=Singleton):
 
     @staticmethod
     def print_states() -> None:
-        i = 1
-        for key in State.state_map:
+        i = 0
+        for state in State.state_list:
             print(f"State {i}:")
             i += 1
-            print(State.state_map[key])
+            print(state)
+
+    @staticmethod
+    def create_table() -> list[dict[str, Optional: Rule | int]]:
+        table = []
+        
+        for state in State.state_list:
+
+            row = {}
+            for edge, node in state.edges.items():
+                if edge in row:
+                    raise RuntimeError(f"shift conflict for {edge} in state.. {state}")
+
+                row[edge] = State.state_list.index(node)
+            
+            for item in state.reductions:
+                for lookahead in item.lookahead:
+                    if lookahead in row:
+                        raise RuntimeError(f"reduce conflict for {lookahead} in state.. {state}")
+
+                    row[lookahead] = item.rule 
+            table.append(row)
+        
+        return table            
+
+    def print_table(table: list[dict[str, Optional: Rule | int]]) -> None:
+        for i in range(len(table)):
+            row = table[i]
+            
+            print(f"State {i}")
+            for symbol, cell in row.items():
+                if isinstance(cell, Rule):
+                    print(f"{symbol} --> {cell.lhs} ::= {" ".join(cell.rhs)}")
+
+                elif isinstance(cell, int):
+                    print(f"{symbol} --> S{cell}")
+
+                else:
+                    raise RuntimeError(f"cell in table not Rule or State number, type {type(cell)}")
+            print("\n")
 
     @staticmethod
     def generate(file_name):
@@ -178,11 +227,23 @@ class Generator(metaclass=Singleton):
         start = Generator._get_augment_start()
         Grammar._rules[start.lhs] = [start.rhs] 
 
-        State.make_state_map(State(start))
+        State.make_graph(State(start))
+        
         Generator.print_states()
+
+        table = Generator.create_table()
+        Generator.print_table(table)
 
 if __name__ == "__main__":
     filename = "./PARSING/parse_tables/BNF1.txt"
     Generator.generate(filename)
 
-# <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-listc
+# FEATURES
+# 1. Generate Table (Options for output)
+# 2. more tests
+# 3. this thing...  ->  # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list
+# 4. REFACTOR
+
+# BUGS
+# 3. if multiple cores, wont merge lookaheads within item set
+# 4. do tag tests work with this approach? idk...

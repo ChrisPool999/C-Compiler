@@ -296,7 +296,7 @@ class TestState(unittest.TestCase):
                                                | b""")
         core = parse_item("S' ::=   . S , $")
         state = State(core)
-        State.make_state_map(state)
+        State.make_graph(state)
 
         assert "S" in state.edges
         assert "X" in state.edges
@@ -311,7 +311,7 @@ class TestState(unittest.TestCase):
                                                | b""")
         core = parse_item("S' ::=   . S , $")
         state = State(core)
-        State.make_state_map(state)
+        State.make_graph(state)
 
         edge = state.edges["X"]
         assert edge.core == Core(parse_item("S ::= X  . X , $"))
