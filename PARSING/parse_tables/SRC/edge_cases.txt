@@ -1,8 +1,0 @@
-- closure
-  - what if we do a bunch of closure recursion
-    - lose the lookahead of a previous, but need it
-    - what if we've seen the symbol, but we havent had that symbol with tags yet
-
-- states
-  - when performing closure, if symbol has been seen before
-    - need to merge lookaheads for all LHS
