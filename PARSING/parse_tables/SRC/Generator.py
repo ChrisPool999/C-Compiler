@@ -124,19 +124,9 @@ class State:
 
     def add_reduction(self, item) -> None:
         if item in self.reductions:
-            raise RuntimeError("error adding reduction. reduction already valid. Something else wrong with program?")
+            raise RuntimeError(f"reduction already added. cycle issue? \n{self}")
         
         self.reductions[item] = item.lookahead
-
-        if self.is_reduction_ambiguous(item.lookahead):
-            raise RuntimeError("reduction/reduction ambiguity. Multiple reductions with same lookahead")
-
-    def is_reduction_ambiguous(self, new_lookahead: set[str]) -> bool:
-        for item, old_lookahead in self.reductions.items():
-            if len(new_lookahead | old_lookahead) != 0:
-                return False
-
-        return True
 
     def _get_edges(self) -> dict[str, Core]:
         edges = {}
@@ -189,14 +179,14 @@ class Generator(metaclass=Singleton):
             row = {}
             for edge, node in state.edges.items():
                 if edge in row:
-                    raise RuntimeError(f"shift conflict for {edge} in state.. {state}")
+                    raise RuntimeError(f"shift conflict for {edge} in state.. \n{state}")
 
                 row[edge] = State.state_list.index(node)
             
             for item in state.reductions:
                 for lookahead in item.lookahead:
                     if lookahead in row:
-                        raise RuntimeError(f"reduce conflict for {lookahead} in state.. {state}")
+                        raise RuntimeError(f"reduce conflict for {lookahead} in state.. \n{state}")
 
                     row[lookahead] = item.rule 
             table.append(row)
@@ -235,11 +225,11 @@ class Generator(metaclass=Singleton):
         Generator.print_table(table)
 
 if __name__ == "__main__":
-    filename = "./PARSING/parse_tables/BNF1.txt"
+    filename = "./PARSING/parse_tables/BNF3.txt"
     Generator.generate(filename)
 
 # FEATURES
-# 1. Generate Table (Options for output)
+# 1. Generate Table (Create C++ file for use)
 # 2. more tests
 # 3. this thing...  ->  # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list
 # 4. REFACTOR
@@ -247,3 +237,83 @@ if __name__ == "__main__":
 # BUGS
 # 3. if multiple cores, wont merge lookaheads within item set
 # 4. do tag tests work with this approach? idk...
+
+
+# - cant have expansions that are all optional
+# - what about when theres multiple tags per expansion eg S -> . A? B* C+
+#                                                         S -> . A B* C+
+#                                                         S -> . B* C+
+
+
+
+    # def _find_follow(self, offset: int = 0) -> set[str]:
+    #     """ 
+    #         Finds the follow() of a symbol\n
+    #         The follow() is the set of terminals that can appear after a symbol within a rule\n
+    #         Includes any cases where the symbol may be optional, repetitive, or the last symbol in a rule\n
+
+    #         Parameters:\n
+    #         item (Item)\n
+    #         offset (int) (Only intended for internal use) Offset shifts the progress position of rule forward. \n
+
+    #         Returns:
+    #         set[str]: returns a set of terminals symbols that could possibly follow a symbol in a rule
+    #     """        
+    #     pos = self.pos + offset
+    #     if pos >= len(self.rhs): 
+    #         return set()
+
+    #     terminals = set()
+
+    #     # if the current symbol can repeat, the next symbol could be a repetition
+    #     curr_symbol = self.rhs[self.pos]
+    #     # if Grammar.is_repetitive(curr_symbol):
+    #     #     terminals |= Grammar.find_first(curr_symbol)
+
+    #     # follow of the end symbol = follow of LHS/reduction = item's look-ahead
+    #     if pos == len(self.rhs) - 1:
+    #         terminals |= self.lookahead
+    #         return terminals
+
+    #     next_symbol = self.rhs[pos + 1]
+    #     # if Grammar.is_optional(next_symbol):
+    #     #     terminals |= self._find_follow(offset + 1)
+
+    # def _get_optional_item_rule(self):
+    #     if self.pos >= len(self.rhs):
+    #         raise RuntimeError(f"This item has completed. No current symbol to modify\n {self}")
+        
+    #     item = copy.deepcopy(self)
+    #     del item.rhs[self.pos]
+    #     self.pos -= 1
+
+    #     # if item.rhs == []:
+    #     #     raise RuntimeError(f"Item expansion symbols shouldn't be all optional. " 
+    #     #                        "Define the symbol as optional at the call site instead of globally\n"
+    #     #                        f"{self}")
+
+    #     item.lookahead = item._find_follow()
+
+    #     return item                    
+
+    # def _get_repetitive_item_rule(self):
+    #     if self.pos >= len(self.rhs):
+    #         raise RuntimeError(f"This item has completed. No current symbol to modify\n {self}")
+
+    #     symbol = Grammar.remove_tags(self.rhs[self.pos])
+    #     lookahead = Grammar.find_first(symbol)
+    #     return Item(Rule(symbol, [symbol, symbol]), lookahead)
+
+    # def _create_tag_sets(self) -> list[Item]:
+    #     new_items = []
+    #     symbol = self.rhs[self.pos]
+
+    #     if Grammar.is_optional(symbol):
+    #         optional_rule = self._get_optional_item_rule()
+    #         new_items.append(optional_rule)
+
+    #     if Grammar.is_repetitive(symbol):
+    #         repetitive_rule = self._get_repetitive_item_rule()
+    #         new_items.append(repetitive_rule)
+
+    #     return new_items
