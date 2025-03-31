@@ -1,9 +1,22 @@
 from collections import namedtuple
 from BNFError import BNFError
 from Singleton import Singleton
+from typing import Any
 
 Rule = namedtuple("Rule", ["lhs", "rhs"])
 
+def safe_index(lst: list[Any], value: Any) -> int:
+    try:
+        return lst.index(value)
+    except:
+        return -1
+
+def safe_rindex(lst: list[Any], value: Any) -> int:
+    try:
+        return lst.rindex(value)
+    except:
+        return -1
+    
 class Grammar(metaclass=Singleton):
     _rules: dict[str, list[list[str]]] = {}
     TAGS = ['{', '}', '+', '*', '?']
@@ -68,21 +81,16 @@ class Grammar(metaclass=Singleton):
             Parameter: symbol(str)
             Returns: str 
         """
-        if len(symbol) <= 2:
+        start = safe_index(symbol, "{")
+        end = safe_rindex(symbol, "}")
+
+        if start == -1 or end == -1 :
             return symbol
-
-        left:int = 0
-        right:int = len(symbol) - 1
-
-        while left < len(symbol) and symbol[left] in cls.TAGS:
-            left += 1
-        while right >= 0 and symbol[right] in cls.TAGS:
-            right -= 1
-
-        if right < left:
-            raise RuntimeError(f"symbol '{symbol}' contains only tag characters")
-
-        return symbol[left : right + 1]
+    
+        if (end - start) == 1:
+            raise ValueError(f"No string include inside brackets. {symbol}")
+        
+        return symbol[start + 1 : end]
 
     @classmethod
     def find_first(cls, symbol: str, seen: set = None) -> set[str]:
