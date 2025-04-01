@@ -57,6 +57,9 @@ class State:
 
     def get_yellow_str_output(self, string: str) -> str:
         return f"\033[93m{string}\033[0m"
+ 
+    def get_pink_str_output(self, string: str) -> str:
+        return f"\033[95m{string}\033[0m"
 
     def get_green_str_output(self, string: str) -> str:
         return "\033[92m{string}\033[0m"
@@ -64,8 +67,11 @@ class State:
     def __repr__(self) -> str:
         result = ""
         for item in self.core.items:
-            result += self.get_yellow_str_output(str(item)) + "\n"
-        
+            if item.pos >= len(item.rhs):
+                result += self.get_pink_str_output(str(item)) + "\n"
+            else:
+                result += self.get_yellow_str_output(str(item)) + "\n"
+
         for item in self._items:
             if item.pos >= len(item.rhs):
                 result += self.get_green_str_output(str(item)) + "\n"
@@ -228,6 +234,15 @@ if __name__ == "__main__":
     filename = "./PARSING/parse_tables/BNF3.txt"
     Generator.generate(filename)
 
+# S -> . A? B* C+
+
+# A? = A
+# A? = . 
+#
+# B* = B B*
+# B* = . 
+
+
 # FEATURES
 # 1. Generate Table (Create C++ file for use)
 # 2. more tests
@@ -243,77 +258,3 @@ if __name__ == "__main__":
 # - what about when theres multiple tags per expansion eg S -> . A? B* C+
 #                                                         S -> . A B* C+
 #                                                         S -> . B* C+
-
-
-
-    # def _find_follow(self, offset: int = 0) -> set[str]:
-    #     """ 
-    #         Finds the follow() of a symbol\n
-    #         The follow() is the set of terminals that can appear after a symbol within a rule\n
-    #         Includes any cases where the symbol may be optional, repetitive, or the last symbol in a rule\n
-
-    #         Parameters:\n
-    #         item (Item)\n
-    #         offset (int) (Only intended for internal use) Offset shifts the progress position of rule forward. \n
-
-    #         Returns:
-    #         set[str]: returns a set of terminals symbols that could possibly follow a symbol in a rule
-    #     """        
-    #     pos = self.pos + offset
-    #     if pos >= len(self.rhs): 
-    #         return set()
-
-    #     terminals = set()
-
-    #     # if the current symbol can repeat, the next symbol could be a repetition
-    #     curr_symbol = self.rhs[self.pos]
-    #     # if Grammar.is_repetitive(curr_symbol):
-    #     #     terminals |= Grammar.find_first(curr_symbol)
-
-    #     # follow of the end symbol = follow of LHS/reduction = item's look-ahead
-    #     if pos == len(self.rhs) - 1:
-    #         terminals |= self.lookahead
-    #         return terminals
-
-    #     next_symbol = self.rhs[pos + 1]
-    #     # if Grammar.is_optional(next_symbol):
-    #     #     terminals |= self._find_follow(offset + 1)
-
-    # def _get_optional_item_rule(self):
-    #     if self.pos >= len(self.rhs):
-    #         raise RuntimeError(f"This item has completed. No current symbol to modify\n {self}")
-        
-    #     item = copy.deepcopy(self)
-    #     del item.rhs[self.pos]
-    #     self.pos -= 1
-
-    #     # if item.rhs == []:
-    #     #     raise RuntimeError(f"Item expansion symbols shouldn't be all optional. " 
-    #     #                        "Define the symbol as optional at the call site instead of globally\n"
-    #     #                        f"{self}")
-
-    #     item.lookahead = item._find_follow()
-
-    #     return item                    
-
-    # def _get_repetitive_item_rule(self):
-    #     if self.pos >= len(self.rhs):
-    #         raise RuntimeError(f"This item has completed. No current symbol to modify\n {self}")
-
-    #     symbol = Grammar.remove_tags(self.rhs[self.pos])
-    #     lookahead = Grammar.find_first(symbol)
-    #     return Item(Rule(symbol, [symbol, symbol]), lookahead)
-
-    # def _create_tag_sets(self) -> list[Item]:
-    #     new_items = []
-    #     symbol = self.rhs[self.pos]
-
-    #     if Grammar.is_optional(symbol):
-    #         optional_rule = self._get_optional_item_rule()
-    #         new_items.append(optional_rule)
-
-    #     if Grammar.is_repetitive(symbol):
-    #         repetitive_rule = self._get_repetitive_item_rule()
-    #         new_items.append(repetitive_rule)
-
-    #     return new_items
