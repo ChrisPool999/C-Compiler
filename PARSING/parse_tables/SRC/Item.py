@@ -15,8 +15,8 @@ class Item:
 
     @staticmethod
     def get_rule_with_pos(item: Item) -> str:
-        # if not isinstance(item, Item):
-            # raise ValueError("arg should be of type Item")
+        if not isinstance(item, Item):
+            raise ValueError("arg should be of type Item")
 
         expansion = " "
         for i in range(len(item.rhs)):
@@ -115,21 +115,24 @@ class Item:
 
     def _create_tag_sets(self, symbol: str) -> list[Item]:
         new_items = []
+        if not Grammar.is_optional(symbol) or not Grammar.is_repetitive(symbol):
+            return []
+        if Grammar.is_optional(self.lhs) or Grammar.is_repetitive(self.lhs):
+            return []
 
-        # symbol needs to be able to repeat any number of times
-        if Grammar.is_repetitive(symbol):
-            repetition_symbol = "{" + Grammar.remove_tags(symbol) + "}*"
-            lookahead = self._find_follow()
-            item = Item(Rule(symbol, [symbol, repetition_symbol]), lookahead)
-            new_items.append(item)
-        
         # empty rhs means we can create the LHS with no input needed
         if Grammar.is_optional(symbol):
             new_item = copy.deepcopy(self)
             new_item.rhs[new_item.pos] = Grammar.remove_tags(new_item.rhs[new_item.pos])
             lookahead = new_item._find_follow()
-            
             new_items.append(Item(Rule(symbol, []), lookahead))
+
+        # symbol needs to be able to repeat any number of times
+        if Grammar.is_repetitive(symbol):
+            repetition_symbol = "{" + Grammar.remove_tags(symbol) + "}*"
+            lookahead = self._find_follow()
+            item = Item(Rule(symbol, [Grammar.remove_tags(symbol), repetition_symbol]), lookahead)
+            new_items.append(item)
 
         return new_items
 

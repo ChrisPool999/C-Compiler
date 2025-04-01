@@ -62,7 +62,7 @@ class State:
         return f"\033[95m{string}\033[0m"
 
     def get_green_str_output(self, string: str) -> str:
-        return "\033[92m{string}\033[0m"
+        return f"\033[92m{string}\033[0m"
 
     def __repr__(self) -> str:
         result = ""
@@ -192,9 +192,10 @@ class Generator(metaclass=Singleton):
             for item in state.reductions:
                 for lookahead in item.lookahead:
                     if lookahead in row:
-                        raise RuntimeError(f"reduce conflict for {lookahead} in state.. \n{state}")
+                        raise RuntimeError(f"reduce conflict for {lookahead} in state.. \n{state}\n{state.reductions}")
 
                     row[lookahead] = item.rule 
+
             table.append(row)
         
         return table            
@@ -234,27 +235,44 @@ if __name__ == "__main__":
     filename = "./PARSING/parse_tables/BNF3.txt"
     Generator.generate(filename)
 
-# S -> . A? B* C+
+"""
+S -> . A? B* C+
 
-# A? = A
-# A? = . 
-#
-# B* = B B*
-# B* = . 
+A? = A
+A? = . 
 
-
-# FEATURES
-# 1. Generate Table (Create C++ file for use)
-# 2. more tests
-# 3. this thing...  ->  # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list
-# 4. REFACTOR
-
-# BUGS
-# 3. if multiple cores, wont merge lookaheads within item set
-# 4. do tag tests work with this approach? idk...
+B* = B B*
+B* = . 
 
 
-# - cant have expansions that are all optional
-# - what about when theres multiple tags per expansion eg S -> . A? B* C+
-#                                                         S -> . A B* C+
-#                                                         S -> . B* C+
+FEATURES
+1. Generate Table (Create C++ file for use)
+2. more tests
+3. this thing...  ->  # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list
+4. REFACTOR
+
+BUGS
+3. if multiple cores, wont merge lookaheads within item set
+4. do tag tests work with this approach? idk...
+
+
+- cant have expansions that are all optional
+- what about when theres multiple tags per expansion eg S -> . A? B* C+
+                                                        S -> . A B* C+
+                                                        S -> . B* C+
+________________________________________
+
+* symbol
+X* = .      --> rule ending, should be next symbol. .
+X* = X X*   --> 
+X* = X      --> 
+
+? symbol
+X? = .
+X? = X
+
++ symbol
+X+ = X 
+X+ = X X+
+
+"""

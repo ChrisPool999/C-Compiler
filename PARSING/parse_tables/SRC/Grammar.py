@@ -62,6 +62,10 @@ class Grammar(metaclass=Singleton):
                     cls._rules[lhs] = [rule.rhs]
 
     @classmethod
+    def contains_tag(cls, symbol) -> bool:
+        return 
+
+    @classmethod
     def is_terminal(cls, symbol: str) -> bool:
         """
             Returns true if a symbol can no longer expand\n
