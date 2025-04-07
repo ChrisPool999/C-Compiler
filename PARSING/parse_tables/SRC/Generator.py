@@ -236,14 +236,6 @@ if __name__ == "__main__":
     Generator.generate(filename)
 
 """
-S -> . A? B* C+
-
-A? = A
-A? = . 
-
-B* = B B*
-B* = . 
-
 
 FEATURES
 1. Generate Table (Create C++ file for use)
@@ -254,25 +246,12 @@ FEATURES
 BUGS
 3. if multiple cores, wont merge lookaheads within item set
 4. do tag tests work with this approach? idk...
-
+5. generating tag items if its the last one? will they have access to the LHS lookahead?
 
 - cant have expansions that are all optional
 - what about when theres multiple tags per expansion eg S -> . A? B* C+
                                                         S -> . A B* C+
                                                         S -> . B* C+
 ________________________________________
-
-* symbol
-X* = .      --> rule ending, should be next symbol. .
-X* = X X*   --> 
-X* = X      --> 
-
-? symbol
-X? = .
-X? = X
-
-+ symbol
-X+ = X 
-X+ = X X+
 
 """

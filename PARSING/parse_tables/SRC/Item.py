@@ -1,5 +1,5 @@
 from __future__ import annotations
-from Grammar import Grammar, Rule
+from Grammar import Grammar, Tags, Rule
 from BNFError import BNFError
 import copy
 
@@ -113,37 +113,75 @@ class Item:
             or (Grammar.is_terminal(self.rhs[self.pos]) and not Grammar.is_optional(self.rhs[self.pos]) and not Grammar.is_repetitive(self.rhs[self.pos]))
         )
 
+    def _get_tagless_lookahead(self) -> set[str]:
+        item = copy.deepcopy(self)
+        item.rhs[item.pos] = Grammar.remove_tags(item.rhs[item.pos])
+        return item._find_follow()
+
+    def _create_plus_tag_items(self) -> list[Item]:
+        if self.pos >= len(self.rhs) or Grammar.get_tag(self.rhs[self.pos]) != Tags.PLUS_TAG:
+            raise ValueError(f"{self}: The next symbol on this item is not a plus tag.\n")       
+
+        tag_symbol = self.rhs[self.pos]
+        tagless_symbol = Grammar.remove_tags(tag_symbol)
+        symbol_terminals = Grammar.find_first(tagless_symbol)
+        lookahead = self._get_tagless_lookahead()
+
+        items = []
+        items.append(Item(Rule(tag_symbol, [tagless_symbol]), lookahead))
+        items.append(Item(Rule(tag_symbol, [tagless_symbol, tag_symbol]), lookahead | symbol_terminals))
+
+        return items
+
+    def _create_question_tag_items(self) -> list[Item]:
+        if self.pos >= len(self.rhs) or Grammar.get_tag(self.rhs[self.pos]) != Tags.QUESTION_TAG:
+            raise ValueError(f"{self}: The next symbol on this item is not a question tag.\n")       
+
+        tag_symbol = self.rhs[self.pos]
+        tagless_symbol = Grammar.remove_tags(tag_symbol)
+        lookahead = self._find_follow()
+
+        items = []
+        items.append(Item(Rule(tag_symbol, []), lookahead))
+        items.append(Item(Rule(tag_symbol, [tagless_symbol]), lookahead))
+
+        return items
+
+    def _create_kleene_tag_items(self) -> list[Item]:
+        if self.pos >= len(self.rhs) or Grammar.get_tag(self.rhs[self.pos]) != Tags.KLEENE_TAG:
+            raise ValueError(f"{self}: The next symbol on this item is not a kleene tag.\n")       
+
+        tag_symbol = self.rhs[self.pos]
+        tagless_symbol = Grammar.remove_tags(tag_symbol)
+        symbol_terminals = Grammar.find_first(tagless_symbol)
+        tagless_lookahead = self._get_tagless_lookahead()
+
+        items = []
+        items.append(Item(Rule(tag_symbol, []), tagless_lookahead))
+        items.append(Item(Rule(tag_symbol, [tagless_symbol, tag_symbol]), self._find_follow() | symbol_terminals))
+
+        return items
+
     def _create_tag_sets(self, symbol: str) -> list[Item]:
-        new_items = []
-        if not Grammar.is_optional(symbol) or not Grammar.is_repetitive(symbol):
+        items = []
+        tag = Grammar.get_tag(symbol)
+
+        if not tag or Grammar.get_tag(self.lhs):
             return []
-        if Grammar.is_optional(self.lhs) or Grammar.is_repetitive(self.lhs):
-            return []
 
-        # empty rhs means we can create the LHS with no input needed
-        if Grammar.is_optional(symbol):
-            new_item = copy.deepcopy(self)
-            new_item.rhs[new_item.pos] = Grammar.remove_tags(new_item.rhs[new_item.pos])
-            lookahead = new_item._find_follow()
-            new_items.append(Item(Rule(symbol, []), lookahead))
+        if tag == Tags.PLUS_TAG: items += self._create_plus_tag_items()
+        if tag == Tags.QUESTION_TAG: items += self._create_question_tag_items()
+        if tag == Tags.KLEENE_TAG: items += self._create_kleene_tag_items()
 
-        # symbol needs to be able to repeat any number of times
-        if Grammar.is_repetitive(symbol):
-            repetition_symbol = "{" + Grammar.remove_tags(symbol) + "}*"
-            lookahead = self._find_follow()
-            item = Item(Rule(symbol, [Grammar.remove_tags(symbol), repetition_symbol]), lookahead)
-            new_items.append(item)
-
-        return new_items
+        return items
 
     def _get_closure_items(self, seen) -> list[Item]:
         symbol = self.rhs[self.pos]
         items = self._create_tag_sets(symbol)
 
-        lhs = Grammar.remove_tags(symbol)
-        if lhs in Grammar._rules:
+        if symbol in Grammar._rules:
             lookahead = self._find_follow()
-            for rhs in Grammar._rules[lhs]:
+            for rhs in Grammar._rules[symbol]:
                 items.append(Item(Rule(symbol, rhs), lookahead))
 
         new = []
@@ -172,9 +210,6 @@ class Item:
             return []
 
         new_items = self._get_closure_items(seen)
-
-        if self.pos + 1 < len(self.rhs) and Grammar.is_optional(self.rhs[self.pos]):
-            new_items += Item(Rule(self.lhs, self.rhs), self.lookahead, self.pos + 1).closure(seen)
 
         i = 0
         while i < len(new_items):

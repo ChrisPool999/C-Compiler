@@ -17,11 +17,17 @@ def safe_rindex(lst: list[Any], value: Any) -> int:
     except:
         return -1
     
+class Tags(metaclass=Singleton):
+    PLUS_TAG = "+"
+    QUESTION_TAG = "?"
+    KLEENE_TAG = "*"
+
+    OPTIONAL_TAGS = [KLEENE_TAG, QUESTION_TAG]
+    REPETITIVE_TAGS = [KLEENE_TAG, PLUS_TAG]
+    ALL_TAGS = [PLUS_TAG, QUESTION_TAG, KLEENE_TAG]
+
 class Grammar(metaclass=Singleton):
     _rules: dict[str, list[list[str]]] = {}
-    TAGS = ['{', '}', '+', '*', '?']
-    OPTIONAL_TAGS = ['*', '?']
-    REPETITION_TAGS = ['*', '+']
 
     def parse_file(self, filename: str) -> None:
         with open(filename, 'r') as file: 
@@ -62,8 +68,14 @@ class Grammar(metaclass=Singleton):
                     cls._rules[lhs] = [rule.rhs]
 
     @classmethod
-    def contains_tag(cls, symbol) -> bool:
-        return 
+    def get_tag(cls, symbol) -> str:
+        start = safe_index(symbol, "{")
+        end = safe_rindex(symbol, "}")
+
+        if start == 0 and end == len(symbol) - 2:
+            return symbol[-1]
+        
+        return ""
 
     @classmethod
     def is_terminal(cls, symbol: str) -> bool:
@@ -122,7 +134,8 @@ class Grammar(metaclass=Singleton):
             for s in RHS:
                 terminals |= cls.find_first(s, seen)
                 # if optional, next symbol terminals are valid
-                if not cls.is_optional(s): break
+                # if s not in Tags.OPTIONAL_TAGS:
+                if Grammar.get_tag(s) not in Tags.OPTIONAL_TAGS: break 
 
         return terminals
 
@@ -137,7 +150,7 @@ class Grammar(metaclass=Singleton):
             Returns: bool
         """
         return (
-            ((len(symbol)) > 1 and symbol[-1] in cls.OPTIONAL_TAGS) or 
+            ((len(symbol)) > 1 and symbol[-1] in Tags.OPTIONAL_TAGS) or 
             ("ε" in cls._rules.get(symbol, []))
         )
 
@@ -151,7 +164,7 @@ class Grammar(metaclass=Singleton):
 
             returns: bool
         """
-        return len(symbol) > 1 and symbol[-1] in cls.REPETITION_TAGS
+        return len(symbol) > 1 and symbol[-1] in Tags.REPETITIVE_TAGS
 
     # used for testing and debugging
     @classmethod
