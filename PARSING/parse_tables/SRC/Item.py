@@ -2,6 +2,7 @@ from __future__ import annotations
 from Grammar import Grammar, Tags, Rule
 from BNFError import BNFError
 import copy
+import shutil
 
 class Item:
 
@@ -12,6 +13,18 @@ class Item:
     @property
     def rhs(self):
         return self.rule.rhs
+
+    @classmethod
+    def get_yellow_str_output(cls, string: str) -> str:
+        return f"\033[93m{string}\033[0m"
+
+    @classmethod 
+    def get_pink_str_output(cls, string: str) -> str:
+        return f"\033[95m{string}\033[0m"
+
+    @classmethod
+    def get_green_str_output(cls, string: str) -> str:
+        return f"\033[92m{string}\033[0m"
 
     @staticmethod
     def get_rule_with_pos(item: Item) -> str:
@@ -64,12 +77,26 @@ class Item:
 
         return hash(string)
 
-    def __repr__(self) -> str:
+    def responsive_item_print(self) -> str:
+        item = self.get_rule_with_pos(self)
+
+        max = shutil.get_terminal_size().columns
+        curr = len(item)
+
         lookahead_list = ""
         for terminal in self.lookahead:
-            lookahead_list += terminal + " "
+            if curr + len(terminal) >= max - 6: 
+                lookahead_list += "\n" + (" " * 20)
+                curr = 20
 
-        return (self.get_rule_with_pos(self) + ", " + lookahead_list)
+            lookahead_list += terminal + " "            
+            curr += len(terminal) + 1
+
+        return item + " , " + lookahead_list
+
+
+    def __repr__(self) -> str:
+        return self.responsive_item_print()
 
     def _find_follow(self, offset: int = 0) -> set[str]:
         """ 
@@ -128,7 +155,7 @@ class Item:
         lookahead = self._get_tagless_lookahead()
 
         items = []
-        items.append(Item(Rule(tag_symbol, [tagless_symbol]), lookahead))
+        items.append(Item(Rule(tag_symbol, [tagless_symbol]), self._find_follow() - Grammar.find_first(tagless_symbol)))
         items.append(Item(Rule(tag_symbol, [tagless_symbol, tag_symbol]), lookahead | symbol_terminals))
 
         return items
@@ -156,17 +183,17 @@ class Item:
         symbol_terminals = Grammar.find_first(tagless_symbol)
         tagless_lookahead = self._get_tagless_lookahead()
 
-        items = []
-        items.append(Item(Rule(tag_symbol, []), tagless_lookahead))
+        items = []                                               # HACK
+        items.append(Item(Rule(tag_symbol, []), tagless_lookahead - Grammar.find_first(tagless_symbol)))
         items.append(Item(Rule(tag_symbol, [tagless_symbol, tag_symbol]), self._find_follow() | symbol_terminals))
 
         return items
 
-    def _create_tag_sets(self, symbol: str) -> list[Item]:
+    def _create_tag_sets(self, symbol: str, seen) -> list[Item]:
         items = []
         tag = Grammar.get_tag(symbol)
 
-        if not tag or Grammar.get_tag(self.lhs):
+        if not tag:
             return []
 
         if tag == Tags.PLUS_TAG: items += self._create_plus_tag_items()
@@ -177,9 +204,9 @@ class Item:
 
     def _get_closure_items(self, seen) -> list[Item]:
         symbol = self.rhs[self.pos]
-        items = self._create_tag_sets(symbol)
+        items = self._create_tag_sets(symbol, seen)
 
-        if symbol in Grammar._rules:
+        if not Grammar.get_tag(symbol) and symbol in Grammar._rules:
             lookahead = self._find_follow()
             for rhs in Grammar._rules[symbol]:
                 items.append(Item(Rule(symbol, rhs), lookahead))

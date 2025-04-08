@@ -55,26 +55,17 @@ class State:
     def items(self):
         return self._items
 
-    def get_yellow_str_output(self, string: str) -> str:
-        return f"\033[93m{string}\033[0m"
- 
-    def get_pink_str_output(self, string: str) -> str:
-        return f"\033[95m{string}\033[0m"
-
-    def get_green_str_output(self, string: str) -> str:
-        return f"\033[92m{string}\033[0m"
-
     def __repr__(self) -> str:
         result = ""
         for item in self.core.items:
             if item.pos >= len(item.rhs):
-                result += self.get_pink_str_output(str(item)) + "\n"
+                result += Item.get_pink_str_output(str(item)) + "\n"
             else:
-                result += self.get_yellow_str_output(str(item)) + "\n"
+                result += Item.get_yellow_str_output(str(item)) + "\n"
 
         for item in self._items:
             if item.pos >= len(item.rhs):
-                result += self.get_green_str_output(str(item)) + "\n"
+                result += Item.get_green_str_output(str(item)) + "\n"
             else:
                 result += (str(item) + "\n")
         
@@ -180,19 +171,19 @@ class Generator(metaclass=Singleton):
     def create_table() -> list[dict[str, Optional: Rule | int]]:
         table = []
         
-        for state in State.state_list:
+        for i, state in enumerate(State.state_list):
 
             row = {}
             for edge, node in state.edges.items():
                 if edge in row:
-                    raise RuntimeError(f"shift conflict for {edge} in state.. \n{state}")
+                    raise RuntimeError(f"shift conflict for \n{edge} in state {i} \n{state}")
 
                 row[edge] = State.state_list.index(node)
             
             for item in state.reductions:
                 for lookahead in item.lookahead:
                     if lookahead in row:
-                        raise RuntimeError(f"reduce conflict for {lookahead} in state.. \n{state}\n{state.reductions}")
+                        raise RuntimeError(f"reduce conflict for \n{lookahead} in state {i} \n{state}")
 
                     row[lookahead] = item.rule 
 
@@ -240,18 +231,9 @@ if __name__ == "__main__":
 FEATURES
 1. Generate Table (Create C++ file for use)
 2. more tests
-3. this thing...  ->  # <parameter-list> , ...    -> can optionally append a comma seperated list of parameter-list
 4. REFACTOR
 
 BUGS
 3. if multiple cores, wont merge lookaheads within item set
-4. do tag tests work with this approach? idk...
-5. generating tag items if its the last one? will they have access to the LHS lookahead?
-
-- cant have expansions that are all optional
-- what about when theres multiple tags per expansion eg S -> . A? B* C+
-                                                        S -> . A B* C+
-                                                        S -> . B* C+
-________________________________________
 
 """

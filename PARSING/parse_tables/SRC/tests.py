@@ -326,3 +326,21 @@ class TestState(unittest.TestCase):
 #     # check any grammer ambiguity is found 
 #     # check for cycles
 #     # check for States with multiple cores
+
+
+# PROBLEM #1   --   SOLVED, BUT MY SOLUTION IS VERY HACK
+# EX: S ::= {A}? {B}* {C}* 
+
+# - table/states
+#   - recursive nature of repetion leads to repetitive item set being merged
+#   - items that end a recursion item set, must ONLY be the following symbol
+
+#   - EXAMPLE:
+#   - X = B* C , B C <-- core
+#   - B* = . , B C <-- lookahead of parent shouldnt have itself, merged with B = B B*
+#   - B* = B B* , B C  <-- because it comes from here, but this lookahead is right
+
+#   - INCLUDES + TAG TOO
+
+# PROBLEM #2
+# multiple cores wont merge any lookaheads inside the item set
