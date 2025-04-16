@@ -1,17 +1,9 @@
 from pathlib import Path
 import unittest
 
-from Singleton import Singleton
-from BNFError import BNFError
 from Grammar import Grammar, Rule
 from Item import Item
 from Generator import Generator, State, Core
-from unittest.mock import mock_open, patch
-
-# State
-#   intial state is right
-#   manages to connect states
-#   avoids duplicates
 
 class TestGrammar(unittest.TestCase):
 
@@ -185,7 +177,7 @@ class TestItem(unittest.TestCase):
         assert closure_items[1] == parse_item("{a}* ::=   . a {a}* , a c")
         assert len(closure_items) == 2
 
-    def test_closure_option_tag(self):
+    def test_closure_question_tag(self):
         # basic
         grammar = TestGrammar.make_new_grammar("""B ::= b
                                                C ::= c""")
@@ -220,7 +212,7 @@ class TestItem(unittest.TestCase):
         assert closure_items[3] == parse_item("D ::=   . c b , $ c")
         assert len(closure_items) == 4
 
-    def test_closure_repetitive_tag(self):
+    def test_closure_kleene_tag(self):
         # basic
         grammar = TestGrammar.make_new_grammar("""B ::= b
                                                C ::= c""")
@@ -268,13 +260,14 @@ class TestState(unittest.TestCase):
 
     @classmethod
     def reset_states(self):
-        for c, other_states in State.state_map.items():
-            other_states.core = None
-            other_states._items = []
-            other_states.edges = {}
-            other_states.reductions = {}
+        for core, states in State.state_map.items():
+            states.core = None
+            states._items = []
+            states.edges = {}
+            states.reductions = {}
 
         State.state_map = {}
+        State.state_list = []
 
     def test_init_state(self):
         grammar = TestGrammar.make_new_grammar("""S ::= X X
@@ -320,8 +313,61 @@ class TestState(unittest.TestCase):
         assert len(edge.items) == 2
         self.reset_states()
 
-#     # check matching states are merged
+class TestGenerator(unittest.TestCase):
 
+    def test_table_output(self):
+        # BASIC
+        grammar = TestGrammar.make_new_grammar("""E ::=	E + T
+                                               |	T
+                                               T ::= T * F
+                                               |	F
+                                               F ::=	( E )
+                                               |	id
+                                               """)
+
+        start = Generator._get_augment_start()
+        Grammar._rules[start.lhs] = [start.rhs] 
+        State.make_graph(State(start))
+        table = Generator.create_table()
+
+        assert len(table) == 12
+        assert {'E': 1, 'T': 2, 'F': 3, '(': 4, 'id': 5} in table
+        assert {'+': 6, '$': Rule(lhs="S'", rhs=['E'])} in table
+        assert {'*': 7, ')': Rule(lhs='E', rhs=['T']), '+': Rule(lhs='E', rhs=['T']), '$': Rule(lhs='E', rhs=['T'])} in table
+        assert {'*': Rule(lhs='T', rhs=['F']), ')': Rule(lhs='T', rhs=['F']), '+': Rule(lhs='T', rhs=['F']), '$': Rule(lhs='T', rhs=['F'])} in table
+        assert {'E': 8, 'T': 2, 'F': 3, '(': 4, 'id': 5} in table
+        assert {'*': Rule(lhs='F', rhs=['id']), ')': Rule(lhs='F', rhs=['id']), '+': Rule(lhs='F', rhs=['id']), '$': Rule(lhs='F', rhs=['id'])} in table
+        assert {'T': 9, 'F': 3, '(': 4, 'id': 5} in table
+        assert {'F': 10, '(': 4, 'id': 5} in table
+        assert {')': 11, '+': 6} in table
+        assert {'*': 7, ')': Rule(lhs='E', rhs=['E', '+', 'T']), '+': Rule(lhs='E', rhs=['E', '+', 'T']), '$': Rule(lhs='E', rhs=['E', '+', 'T'])} in table
+        assert {'*': Rule(lhs='T', rhs=['T', '*', 'F']), ')': Rule(lhs='T', rhs=['T', '*', 'F']), '+': Rule(lhs='T', rhs=['T', '*', 'F']), '$': Rule(lhs='T', rhs=['T', '*', 'F'])} in table
+        assert {'*': Rule(lhs='F', rhs=['(', 'E', ')']), ')': Rule(lhs='F', rhs=['(', 'E', ')']), '+': Rule(lhs='F', rhs=['(', 'E', ')']), '$': Rule(lhs='F', rhs=['(', 'E', ')'])} in table
+
+        TestState.reset_states()
+        grammar = TestGrammar.make_new_grammar("""X ::=	{A}* {B}? {C}+""")
+        start = Generator._get_augment_start()
+        Grammar._rules[start.lhs] = [start.rhs] 
+        State.make_graph(State(start))
+        table = Generator.create_table()
+
+        # TAGS
+        assert len(table) == 10
+        assert {'X': 1, '{A}*': 2, 'A': 3, 'C': Rule(lhs='{A}*', rhs=[]), 'B': Rule(lhs='{A}*', rhs=[])} in table
+        assert {'$': Rule(lhs="S'", rhs=['X'])} in table
+        assert {'{B}?': 4, 'B': 5, 'C': Rule(lhs='{B}?', rhs=[])} in table
+        assert {'{A}*': 6, 'A': 3, 'C': Rule(lhs='{A}*', rhs=[]), 'B': Rule(lhs='{A}*', rhs=[])} in table
+        assert {'{C}+': 7, 'C': 8} in table
+        assert {'C': Rule(lhs='{B}?', rhs=['B'])} in table
+        assert {'A': Rule(lhs='{A}*', rhs=['A', '{A}*']), 'C': Rule(lhs='{A}*', rhs=['A', '{A}*']), 'B': Rule(lhs='{A}*', rhs=['A', '{A}*'])} in table
+        assert {'$': Rule(lhs='X', rhs=['{A}*', '{B}?', '{C}+'])} in table
+        assert {'{C}+': 9, 'C': 8, '$': Rule(lhs='{C}+', rhs=['C'])} in table
+        assert {'C': Rule(lhs='{C}+', rhs=['C', '{C}+']), '$': Rule(lhs='{C}+', rhs=['C', '{C}+'])} in table
+
+G = TestGenerator()
+G.test_table_output()
+
+#     # check matching states are merged
 #     # check grammar reduction rules are valid
 #     # check any grammer ambiguity is found 
 #     # check for cycles
